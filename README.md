@@ -19,6 +19,7 @@ python -m http.server 8000 --directory site
 - `syllabus.md`：6 次课、320 分钟的安排。
 - `sources.csv`：来源、证据位置、访问日期和使用限制。
 - `scope.md`：赛规范围、资料层级与未核验项。
+- qa-report.md：代码、PDF、网站和公开访问验收证据。
 - `figures/`：9 张可编辑原创 SVG。
 - `examples/`：Python/OpenCV 代码和可复现合成帧。
 
