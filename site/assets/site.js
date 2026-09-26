@@ -3,11 +3,7 @@
 
   document.querySelectorAll(".lesson").forEach(function (lesson) {
     var methods = Array.from(lesson.querySelectorAll(".method"));
-    methods.forEach(function (method, index) {
-      method.dataset.level = String(index);
-      method.hidden = index !== 0;
-    });
-
+    methods.forEach(function (method, index) { method.hidden = index !== 0; });
     var switcher = document.createElement("div");
     switcher.className = "tier-switcher";
     switcher.setAttribute("role", "group");
@@ -29,93 +25,376 @@
   });
 
   var W = 160, H = 120;
-  function syntheticFrame(mode, width, height) {
-    var data = new Uint8ClampedArray(width * height);
-    var centers = new Float32Array(height);
+  function clamp(v) { return Math.max(0, Math.min(255, Math.round(v))); }
+
+  function makeFrame(mode, width, height) {
+    var gray = new Uint8ClampedArray(width * height);
     for (var y = 0; y < height; y++) {
       var t = y / Math.max(1, height - 1);
-      var center = mode === "curve" ? 78 + 48 * t * t : 79 + 11 * (t - 0.4);
-      var half = 20 + 18 * t;
-      centers[y] = center;
-      var left = Math.max(4, Math.round(center - half));
-      var right = Math.min(width - 5, Math.round(center + half));
+      var curve = mode === "curve" ? 22 * t * t : 7 * (t - .35);
+      var center = width * .5 + curve;
+      var half = width * (.10 + .115 * t);
+      var left = center - half;
+      var right = center + half;
       for (var x = 0; x < width; x++) {
-        var value = x > left + 1 && x < right - 2 ? 145 : 218;
-        if ((x >= left - 2 && x < left + 2) || (x >= right - 1 && x < right + 3)) value = x < center ? 38 : 42;
-        if (mode === "shadow" && x < width * 0.525 && y >= height * .23 && y < height * .78) value = Math.round(value * .30);
-        if (mode === "glare" && x >= width * .4125 && x < width * .644 && y >= height * .225 && y < height * .783) value = 250;
-        if (mode === "missing" && x >= left - 3 && x < left + 4 && y >= height * .483) value = 180;
-        if (mode === "noise" && ((x * 17 + y * 31) % 997 === 0 || (x * 29 + y * 11) % 1321 === 0)) value = (x + y) % 2 ? 0 : 255;
-        data[y * width + x] = value;
+        var outside = 35 + 27 * t + 15 * x / width + 4 * Math.sin(y * .31 + x * .08);
+        var inside = 173 + 32 * t - 10 * x / width + 7 * Math.sin(x * .13 + y * .07);
+        var edgeDist = Math.min(Math.abs(x-left), Math.abs(x-right));
+        var value = (x > left && x < right) ? inside : outside;
+        if (edgeDist < 3) value = outside + (inside-outside) * edgeDist / 3;
+        if (mode === "shadow" && x < width * .58 && y > height*.20 && y < height*.75)
+          value -= 55;
+        if (mode === "glare" && x > width*.43 && x < width*.72 && y > height*.18 && y < height*.54)
+          value = Math.max(value, 246);
+        if (mode === "missing" && x > right-4 && x < right+5 && y > height*.46)
+          value = 95 + 18*t;
+        if (mode === "noise" && ((x*17+y*31)%997===0 || (x*29+y*11)%1321===0))
+          value = ((x+y)%2) ? 0 : 255;
+        gray[y*width+x] = clamp(value);
       }
     }
-    return { data: data, centers: centers };
+    return gray;
   }
 
-  function paint(canvas, data, width, height, binaryThreshold) {
+  function paint(canvas, values, width, height) {
     var scratch = document.createElement("canvas");
     scratch.width = width;
     scratch.height = height;
-    var sctx = scratch.getContext("2d");
-    var image = sctx.createImageData(width, height);
-    for (var i = 0; i < data.length; i++) {
-      var value = binaryThreshold === null ? data[i] : (data[i] <= binaryThreshold ? 255 : 0);
-      var p = i * 4;
-      image.data[p] = value;
-      image.data[p + 1] = value;
-      image.data[p + 2] = value;
-      image.data[p + 3] = 255;
+    var ctx0 = scratch.getContext("2d");
+    var frameData = ctx0.createImageData(width, height);
+    for (var i=0;i<values.length;i++) {
+      var v=values[i], k=i*4;
+      frameData.data[k]=v; frameData.data[k+1]=v; frameData.data[k+2]=v; frameData.data[k+3]=255;
     }
-    sctx.putImageData(image, 0, 0);
-    var ctx = canvas.getContext("2d");
-    ctx.imageSmoothingEnabled = false;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(scratch, 0, 0, canvas.width, canvas.height);
+    ctx0.putImageData(frameData,0,0);
+    var ctx=canvas.getContext("2d");
+    ctx.imageSmoothingEnabled=false;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(scratch,0,0,canvas.width,canvas.height);
   }
 
-  var thresholdSlider = document.getElementById("threshold-slider");
-  var sceneSelect = document.getElementById("scene-select");
-  var grayCanvas = document.getElementById("gray-canvas");
-  var binaryCanvas = document.getElementById("binary-canvas");
-  var thresholdStatus = document.getElementById("threshold-status");
-  function updateThreshold() {
-    var t = Number(thresholdSlider.value);
-    var scene = syntheticFrame(sceneSelect.value, W, H);
-    paint(grayCanvas, scene.data, W, H, null);
-    paint(binaryCanvas, scene.data, W, H, t);
-    var count = 0;
-    for (var i = 0; i < scene.data.length; i++) if (scene.data[i] <= t) count++;
-    document.getElementById("threshold-value").value = String(t);
-    thresholdStatus.textContent = "阈值 T = " + t + "；暗前景像素 " + count + " / " + (W * H) + "（" + (100 * count / (W * H)).toFixed(1) + "%）";
+  function histOf(values) {
+    var hist=new Uint32Array(256);
+    for(var i=0;i<values.length;i++)hist[values[i]]++;
+    return hist;
   }
-  thresholdSlider.addEventListener("input", updateThreshold);
-  sceneSelect.addEventListener("change", updateThreshold);
-  updateThreshold();
-
-  var fullW = 256, fullH = 160;
-  var fullScene = syntheticFrame("normal", fullW, fullH);
-  var fullCanvas = document.getElementById("full-canvas");
-  var scaledCanvas = document.getElementById("scaled-canvas");
-  var scaleSlider = document.getElementById("scale-slider");
-  function updateScale() {
-    var scale = Number(scaleSlider.value) / 100;
-    var w = Math.max(1, Math.round(fullW * scale));
-    var h = Math.max(1, Math.round(fullH * scale));
-    var small = new Uint8ClampedArray(w * h);
-    for (var y = 0; y < h; y++) {
-      for (var x = 0; x < w; x++) {
-        var sx = Math.min(fullW - 1, Math.floor((x + .5) * fullW / w));
-        var sy = Math.min(fullH - 1, Math.floor((y + .5) * fullH / h));
-        small[y * w + x] = fullScene.data[sy * fullW + sx];
+  function otsuThreshold(hist,total) {
+    var sumAll=0,w0=0,sum0=0,best=-1,bestT=0;
+    for(var i=0;i<256;i++)sumAll+=i*hist[i];
+    for(var t=0;t<255;t++){
+      w0+=hist[t]; sum0+=t*hist[t];
+      var w1=total-w0;
+      if(!w0||!w1)continue;
+      var m0=sum0/w0, m1=(sumAll-sum0)/w1, d=m0-m1;
+      var score=w0*w1*d*d;
+      if(score>best){best=score;bestT=t;}
+    }
+    return bestT;
+  }
+  function intermeans(values) {
+    var min=255,max=0;
+    for(var i=0;i<values.length;i++){if(values[i]<min)min=values[i];if(values[i]>max)max=values[i];}
+    var t=Math.floor((min+max)/2);
+    for(var n=0;n<24;n++){
+      var s0=0,s1=0,c0=0,c1=0;
+      for(var j=0;j<values.length;j++){if(values[j]<=t){s0+=values[j];c0++;}else{s1+=values[j];c1++;}}
+      if(!c0||!c1)break;
+      var next=Math.floor((s0/c0+s1/c1)/2);
+      if(Math.abs(next-t)<=1){t=next;break;}
+      t=next;
+    }
+    return t;
+  }
+  function buildIntegral(values,width,height) {
+    var stride=width+1, integral=new Float64Array((width+1)*(height+1));
+    for(var y=1;y<=height;y++){
+      var row=0;
+      for(var x=1;x<=width;x++){
+        row+=values[(y-1)*width+x-1];
+        integral[y*stride+x]=integral[(y-1)*stride+x]+row;
       }
     }
-    paint(fullCanvas, fullScene.data, fullW, fullH, null);
-    paint(scaledCanvas, small, w, h, null);
-    document.getElementById("scale-value").value = Math.round(scale * 100) + "%";
-    document.getElementById("scaled-size").textContent = w + " × " + h;
-    document.getElementById("gray-bytes").textContent = (w * h).toLocaleString("zh-CN") + " B";
-    document.getElementById("packed-bytes").textContent = Math.ceil(w * h / 8).toLocaleString("zh-CN") + " B";
+    return integral;
   }
-  scaleSlider.addEventListener("input", updateScale);
-  updateScale();
+  function boxSum(integral,stride,x0,y0,x1,y1) {
+    return integral[y1*stride+x1]-integral[y0*stride+x1]-integral[y1*stride+x0]+integral[y0*stride+x0];
+  }
+  function thresholdFrame(values,mode,param,width,height) {
+    var mask=new Uint8ClampedArray(values.length);
+    var threshold=Number(param), rowT=null, integral=null, radius=5;
+    if(mode==="otsu")threshold=otsuThreshold(histOf(values),values.length);
+    if(mode==="row"){
+      rowT=new Uint8Array(height);
+      for(var y=0;y<height;y++)rowT[y]=intermeans(values.subarray(y*width,(y+1)*width));
+    }
+    if(mode==="local")integral=buildIntegral(values,width,height);
+    for(var y=0;y<height;y++){
+      for(var x=0;x<width;x++){
+        var t=threshold;
+        if(mode==="row")t=rowT[y];
+        if(mode==="local"){
+          var x0=Math.max(0,x-radius),x1=Math.min(width,x+radius+1);
+          var y0=Math.max(0,y-radius),y1=Math.min(height,y+radius+1);
+          var count=(x1-x0)*(y1-y0);
+          t=boxSum(integral,width+1,x0,y0,x1,y1)/count+Number(param)/5;
+        }
+        mask[y*width+x]=values[y*width+x]>=t?255:0;
+      }
+    }
+    return {mask:mask,threshold:threshold,rowT:rowT};
+  }
+  function drawHistogram(canvas,hist,marker) {
+    var ctx=canvas.getContext("2d"),w=canvas.width,h=canvas.height;
+    ctx.clearRect(0,0,w,h);ctx.fillStyle="#fffefa";ctx.fillRect(0,0,w,h);
+    var max=1;for(var i=0;i<256;i++)if(hist[i]>max)max=hist[i];
+    ctx.strokeStyle="#d9e1da";
+    for(var g=1;g<4;g++){ctx.beginPath();ctx.moveTo(25,h*g/4);ctx.lineTo(w-10,h*g/4);ctx.stroke();}
+    for(var b=0;b<256;b++){
+      var bh=hist[b]/max*(h-38);
+      ctx.fillStyle="#52696a";ctx.fillRect(26+b*(w-38)/256,h-22-bh,Math.max(1,(w-38)/256),bh);
+    }
+    if(marker>=0&&marker<256){var xx=26+marker*(w-38)/256;ctx.strokeStyle="#ed7a3b";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(xx,8);ctx.lineTo(xx,h-18);ctx.stroke();}
+    ctx.fillStyle="#183235";ctx.font="13px sans-serif";ctx.fillText("0",25,h-4);ctx.fillText("255",w-38,h-4);
+  }
+
+  var sceneSelect=document.getElementById("scene-select");
+  var thresholdMode=document.getElementById("threshold-mode");
+  var thresholdSlider=document.getElementById("threshold-slider");
+  var currentScene=makeFrame("normal",W,H),currentMask=null;
+  function updateThreshold() {
+    currentScene=makeFrame(sceneSelect.value,W,H);
+    var mode=thresholdMode.value,param=Number(thresholdSlider.value);
+    var result=thresholdFrame(currentScene,mode,param,W,H);
+    currentMask=result.mask;
+    paint(document.getElementById("gray-canvas"),currentScene,W,H);
+    paint(document.getElementById("threshold-canvas"),currentMask,W,H);
+    drawHistogram(document.getElementById("histogram-canvas"),histOf(currentScene),
+      (mode==="fixed"||mode==="otsu")?result.threshold:-1);
+    document.getElementById("threshold-value").value=String(mode==="fixed"||mode==="otsu"?result.threshold:param);
+    document.getElementById("threshold-label").value=mode==="fixed"?"T":mode==="otsu"?"Otsu T":mode==="row"?"行阈值起点":"局部 C";
+    var white=0;for(var i=0;i<currentMask.length;i++)if(currentMask[i])white++;
+    document.getElementById("threshold-status").textContent=
+      "模式："+thresholdMode.options[thresholdMode.selectedIndex].text+
+      "；全局阈值="+(mode==="fixed"||mode==="otsu"?result.threshold:"逐行/逐点")+
+      "；白前景 "+white+" / "+(W*H)+" ("+(100*white/(W*H)).toFixed(1)+"%)";
+    updateRatio();updateScanning();
+  }
+  sceneSelect.addEventListener("change",function(){updateThreshold();updateSobel();});
+  thresholdMode.addEventListener("change",updateThreshold);
+  thresholdSlider.addEventListener("input",updateThreshold);
+
+  function ratioQ7(a,b){return Math.floor(Math.abs(a-b)*128/(a+b+1));}
+  function updateRatio() {
+    if(!currentScene)return;
+    var gap=Number(document.getElementById("ratio-gap").value);
+    var th=Number(document.getElementById("ratio-threshold").value);
+    var output=new Uint8ClampedArray(W*H),count=0;
+    for(var y=0;y<H;y++)for(var x=0;x<W;x++){
+      var nx=Math.min(W-1,x+gap),q=ratioQ7(currentScene[y*W+x],currentScene[y*W+nx]);
+      output[y*W+x]=clamp(q*2);
+      if(q>=th)count++;
+    }
+    paint(document.getElementById("ratio-input"),currentScene,W,H);
+    paint(document.getElementById("ratio-output"),output,W,H);
+    document.getElementById("ratio-gap-value").value=String(gap);
+    document.getElementById("ratio-threshold-value").value=String(th);
+    document.getElementById("ratio-status").textContent="候选跳变："+count+" 点；显示图以灰度表示Q7响应强度。";
+  }
+  document.getElementById("ratio-gap").addEventListener("input",updateRatio);
+  document.getElementById("ratio-threshold").addEventListener("input",updateRatio);
+
+  function sobelMaps(pixels,width,height) {
+    var gxmap=new Uint8ClampedArray(width*height),gymap=new Uint8ClampedArray(width*height),mag=new Uint8ClampedArray(width*height);
+    for(var y=1;y<height-1;y++)for(var x=1;x<width-1;x++){
+      var p00=pixels[(y-1)*width+x-1],p01=pixels[(y-1)*width+x],p02=pixels[(y-1)*width+x+1];
+      var p10=pixels[y*width+x-1],p12=pixels[y*width+x+1];
+      var p20=pixels[(y+1)*width+x-1],p21=pixels[(y+1)*width+x],p22=pixels[(y+1)*width+x+1];
+      var gx=-p00+p02-2*p10+2*p12-p20+p22;
+      var gy=-p00-2*p01-p02+p20+2*p21+p22,i=y*width+x;
+      gxmap[i]=clamp(128+gx/8);gymap[i]=clamp(128+gy/8);
+      mag[i]=clamp((Math.abs(gx)+Math.abs(gy))/8);
+    }
+    return {gx:gxmap,gy:gymap,mag:mag};
+  }
+  function updateSobel() {
+    var src=makeFrame(sceneSelect.value,W,H),maps=sobelMaps(src,W,H);
+    var mode=document.getElementById("sobel-channel").value;
+    var th=Number(document.getElementById("sobel-threshold").value),out=maps.mag,count=0;
+    if(mode==="gx")out=maps.gx;
+    if(mode==="gy")out=maps.gy;
+    if(mode==="edges"){
+      out=new Uint8ClampedArray(W*H);
+      for(var i=0;i<out.length;i++){out[i]=maps.mag[i]>=th?255:0;if(out[i])count++;}
+    }
+    paint(document.getElementById("sobel-input"),src,W,H);
+    paint(document.getElementById("sobel-output"),out,W,H);
+    document.getElementById("sobel-value").value=String(th);
+    document.getElementById("sobel-status").textContent=mode==="edges"
+      ?"超过梯度阈值的候选："+count+" 点":"当前通道："+document.getElementById("sobel-channel").selectedOptions[0].text;
+  }
+  document.getElementById("sobel-channel").addEventListener("change",updateSobel);
+  document.getElementById("sobel-threshold").addEventListener("input",updateSobel);
+
+  function edgePair(mask,y,start) {
+    var seed=start;
+    if(seed<1||seed>=W-1)seed=Math.floor(W/2);
+    if(!mask[y*W+seed]){
+      var found=false;
+      for(var d=0;d<W&&!found;d++){
+        var l=seed-d,r=seed+d;
+        if(l>=0&&mask[y*W+l]){seed=l;found=true;}
+        else if(r<W&&mask[y*W+r]){seed=r;found=true;}
+      }
+      if(!found)return {left:-1,right:-1,valid:false};
+    }
+    var left=-1,right=-1;
+    for(var x=seed;x>0;x--)if(mask[y*W+x]&&!mask[y*W+x-1]){left=x;break;}
+    for(var xx=seed;xx<W-1;xx++)if(mask[y*W+xx]&&!mask[y*W+xx+1]){right=xx;break;}
+    return {left:left,right:right,valid:left>=0&&right>left};
+  }
+  function scanRows(mask) {
+    var rows=new Array(H);
+    for(var y=H-1;y>=0;y--)rows[y]=edgePair(mask,y,W/2);
+    return {rows:rows,seedL:-1,seedR:-1,stop:H};
+  }
+  function scanInherit(mask) {
+    var rows=new Array(H),seed=Math.floor(W/2);
+    for(var y=H-1;y>=0;y--){var e=edgePair(mask,y,seed);rows[y]=e;if(e.valid)seed=Math.floor((e.left+e.right)/2);}
+    return {rows:rows,seedL:-1,seedR:-1,stop:H};
+  }
+  function longestSeeds(mask) {
+    var lengths=new Int16Array(W);
+    for(var x=1;x<W-1;x++){var n=0;for(var y=H-1;y>=0&&mask[y*W+x];y--)n++;lengths[x]=n;}
+    var sl=-1,sr=-1,bl=-1,br=-1;
+    for(var x=1;x<W-1;x++)if(lengths[x]>bl){bl=lengths[x];sl=x;}
+    for(var x=W-2;x>0;x--)if(lengths[x]>br){br=lengths[x];sr=x;}
+    return {left:sl,right:sr,stop:Math.min(bl,br)};
+  }
+  function scanLongest(mask) {
+    var s=longestSeeds(mask),rows=new Array(H),seed=Math.floor((s.left+s.right)/2);
+    for(var y=0;y<H;y++)rows[y]=(s.stop>0&&y>=H-s.stop)?edgePair(mask,y,seed):{left:-1,right:-1,valid:false};
+    return {rows:rows,seedL:s.left,seedR:s.right,stop:s.stop};
+  }
+  function updateScanning() {
+    if(!currentScene)return;
+    var mask=currentMask||thresholdFrame(currentScene,"fixed",128,W,H).mask;
+    var mode=document.getElementById("scan-mode").value,y=Number(document.getElementById("scan-row").value);
+    var result=mode==="longest"?scanLongest(mask):mode==="inherit"?scanInherit(mask):scanRows(mask);
+    var overlay=new Uint8ClampedArray(currentScene.length);overlay.set(currentScene);
+    var e=result.rows[y];
+    if(e&&e.valid)for(var x=e.left;x<=e.right;x++)overlay[y*W+x]=x===e.left?82:x===e.right?168:236;
+    if(mode==="longest"&&result.seedL>=0){
+      for(var yy=H-1;yy>=Math.max(0,H-result.stop);yy--){overlay[yy*W+result.seedL]=90;overlay[yy*W+result.seedR]=180;}
+    }
+    paint(document.getElementById("scan-mask"),mask,W,H);
+    paint(document.getElementById("scan-result"),overlay,W,H);
+    document.getElementById("scan-row-value").value=String(y);
+    document.getElementById("scan-status").textContent=e&&e.valid
+      ?"y="+y+"；L="+e.left+"；R="+e.right+"；中点="+Math.floor((e.left+e.right)/2)
+       +(mode==="longest"?"；种子="+result.seedL+"/"+result.seedR+"，搜索截止 "+result.stop+" 行":"")
+      :"y="+y+" 没有有效双边界；记 valid=0，不把画面边缘伪造为边线。";
+  }
+  document.getElementById("scan-mode").addEventListener("change",updateScanning);
+  document.getElementById("scan-row").addEventListener("input",updateScanning);
+
+  var tracePath=[[1,6],[2,6],[3,6],[4,6],[5,6],[6,6],[6,5],[6,4],[6,3],[5,3],[4,3],[3,3],[3,2],[3,1],[4,1],[5,1],[6,1]];
+  var traceDirections=["E","E","E","E","E","N","N","N","W","W","W","N","N","E","E","E"];
+  function drawNeighborSteps() {
+    var canvas=document.getElementById("neighbor-canvas"),ctx=canvas.getContext("2d");
+    var step=Number(document.getElementById("neighbor-steps").value),cell=38,cols=8,rows=8;
+    var ox=(canvas.width-cols*cell)/2,oy=(canvas.height-rows*cell)/2;
+    ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle="#f0f1ed";ctx.fillRect(0,0,canvas.width,canvas.height);
+    for(var y=0;y<rows;y++)for(var x=0;x<cols;x++){
+      var index=tracePath.findIndex(function(p){return p[0]===x&&p[1]===y;});
+      ctx.fillStyle=index>=0&&index<step?"#8a9691":"#fffefa";
+      if(index===step&&step<tracePath.length)ctx.fillStyle="#253735";
+      ctx.fillRect(ox+x*cell+1,oy+y*cell+1,cell-2,cell-2);
+      ctx.strokeStyle="#b8c4bd";ctx.strokeRect(ox+x*cell+1,oy+y*cell+1,cell-2,cell-2);
+      if(index>=0&&index<step){ctx.fillStyle="#fff";ctx.font="14px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(String(index),ox+x*cell+cell/2,oy+y*cell+cell/2);}
+    }
+    document.getElementById("neighbor-steps-value").value=String(step);
+    var pos=tracePath[Math.min(step,tracePath.length-1)];
+    var dir=step>0?traceDirections[Math.min(step-1,traceDirections.length-1)]:"未开始";
+    document.getElementById("neighbor-status").textContent="步="+step+"；当前坐标 ("+pos[0]+","+pos[1]+")；进入方向="+dir+"；最长运行步数="+tracePath.length+"。";
+  }
+  document.getElementById("neighbor-steps").addEventListener("input",drawNeighborSteps);
+
+  function solveLinear(matrix) {
+    var n=matrix.length;
+    for(var col=0;col<n;col++){
+      var pivot=col;
+      for(var row=col+1;row<n;row++)if(Math.abs(matrix[row][col])>Math.abs(matrix[pivot][col]))pivot=row;
+      if(Math.abs(matrix[pivot][col])<1e-10)return null;
+      var tmp=matrix[col];matrix[col]=matrix[pivot];matrix[pivot]=tmp;
+      var d=matrix[col][col];for(var j=col;j<=n;j++)matrix[col][j]/=d;
+      for(var r=0;r<n;r++)if(r!==col){var f=matrix[r][col];for(var k=col;k<=n;k++)matrix[r][k]-=f*matrix[col][k];}
+    }
+    return matrix.map(function(row){return row[n];});
+  }
+  function homography(src,dst) {
+    var a=[];
+    for(var i=0;i<4;i++){
+      var x=src[i][0],y=src[i][1],u=dst[i][0],v=dst[i][1];
+      a.push([x,y,1,0,0,0,-u*x,-u*y,u]);
+      a.push([0,0,0,x,y,1,-v*x,-v*y,v]);
+    }
+    var h=solveLinear(a);
+    return h?[h[0],h[1],h[2],h[3],h[4],h[5],h[6],h[7],1]:null;
+  }
+  function inverse3(m) {
+    var a=m[0],b=m[1],c=m[2],d=m[3],e=m[4],f=m[5],g=m[6],h=m[7],i=m[8];
+    var det=a*(e*i-f*h)-b*(d*i-f*g)+c*(d*h-e*g);
+    if(Math.abs(det)<1e-10)return null;
+    return [(e*i-f*h)/det,(c*h-b*i)/det,(b*f-c*e)/det,
+      (f*g-d*i)/det,(a*i-c*g)/det,(c*d-a*f)/det,
+      (d*h-e*g)/det,(b*g-a*h)/det,(a*e-b*d)/det];
+  }
+  function updateIpm() {
+    var widthPercent=Number(document.getElementById("ipm-top-width").value);
+    var source=makeFrame("curve",W,H),half=W*widthPercent/200,cx=W/2;
+    var src=[[cx-half,12],[cx+half,12],[W-2,H-2],[1,H-2]];
+    var dst=[[W*.28,8],[W*.72,8],[W*.72,H-8],[W*.28,H-8]];
+    var h=homography(src,dst),inv=h?inverse3(h):null,output=new Uint8ClampedArray(W*H);
+    if(inv)for(var y=0;y<H;y++)for(var x=0;x<W;x++){
+      var den=inv[6]*x+inv[7]*y+inv[8];
+      if(Math.abs(den)<1e-9)continue;
+      var sx=(inv[0]*x+inv[1]*y+inv[2])/den;
+      var sy=(inv[3]*x+inv[4]*y+inv[5])/den;
+      var ix=Math.round(sx),iy=Math.round(sy);
+      if(ix>=0&&ix<W&&iy>=0&&iy<H)output[y*W+x]=source[iy*W+ix];
+    }
+    var inputCanvas=document.getElementById("ipm-input");
+    paint(inputCanvas,source,W,H);paint(document.getElementById("ipm-output"),output,W,H);
+    var ctx=inputCanvas.getContext("2d");
+    ctx.save();ctx.scale(inputCanvas.width/W,inputCanvas.height/H);
+    ctx.strokeStyle="#fff";ctx.lineWidth=1;ctx.setLineDash([2,2]);ctx.beginPath();
+    ctx.moveTo(src[0][0],src[0][1]);ctx.lineTo(src[1][0],src[1][1]);ctx.lineTo(src[2][0],src[2][1]);ctx.lineTo(src[3][0],src[3][1]);ctx.closePath();ctx.stroke();
+    ctx.setLineDash([]);src.forEach(function(p){ctx.fillStyle="#252f2e";ctx.fillRect(p[0]-1.5,p[1]-1.5,3,3);});ctx.restore();
+    document.getElementById("ipm-width-value").value=widthPercent+"%";
+    document.getElementById("ipm-status").textContent=inv
+      ?"源四点："+src.map(function(p){return "("+p[0].toFixed(0)+","+p[1]+")";}).join(" ")
+       +"；H[2][2]=1；目标像素通过 H⁻¹ 回原图取样。"
+      :"四点退化，单应矩阵不可解。";
+  }
+  document.getElementById("ipm-top-width").addEventListener("input",updateIpm);
+
+  function updateSampling() {
+    var scale=Number(document.getElementById("scale-slider").value)/100,w0=256,h0=160;
+    var source=makeFrame("normal",w0,h0),w=Math.round(w0*scale),h=Math.round(h0*scale);
+    var small=new Uint8ClampedArray(w*h);
+    for(var y=0;y<h;y++)for(var x=0;x<w;x++){
+      var sx=Math.min(w0-1,Math.floor((x+.5)*w0/w));
+      var sy=Math.min(h0-1,Math.floor((y+.5)*h0/h));
+      small[y*w+x]=source[sy*w0+sx];
+    }
+    paint(document.getElementById("full-canvas"),source,w0,h0);
+    paint(document.getElementById("scaled-canvas"),small,w,h);
+    document.getElementById("scale-value").value=Math.round(scale*100)+"%";
+    document.getElementById("scaled-size").textContent=w+" × "+h;
+    document.getElementById("gray-bytes").textContent=(w*h).toLocaleString("zh-CN")+" B";
+    document.getElementById("packed-bytes").textContent=Math.ceil(w*h/8).toLocaleString("zh-CN")+" B";
+  }
+  document.getElementById("scale-slider").addEventListener("input",updateSampling);
+
+  updateThreshold();updateRatio();updateSobel();updateScanning();drawNeighborSteps();updateIpm();updateSampling();
 }());

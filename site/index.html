@@ -4,319 +4,442 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f3ec">
-  <meta name="description" content="面向智能汽车竞赛实验室新生的镜头车图像处理课程：从像素、灰度、二值化到边线、中线和嵌入式调试。">
-  <title>把像素变成行驶线索｜镜头车图像处理实验室</title>
+  <meta name="description" content="从总钻风灰度帧开始，学习 C 语言图像算法：差比和、阈值、Sobel、扫线、八邻域和逆透视。">
+  <title>图像处理</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/site.css">
   <script src="assets/site.js" defer></script>
 </head>
 <body>
-  <a class="skip-link" href="#main">跳到课程内容</a>
+  <a class="skip-link" href="#main">跳到图像处理内容</a>
   <header class="topbar">
-    <a class="brand" href="#top" aria-label="返回课程首页">
-      <span class="brand-mark" aria-hidden="true">CV</span>
-      <span>视觉训练 / 01</span>
-    </a>
-    <nav class="top-actions" aria-label="资料下载">
-      <a href="syllabus.md">课程大纲</a>
-      <a href="handbook.md">Markdown 讲义</a>
-      <a class="button small" href="handbook.pdf">下载 PDF</a>
+    <a class="brand" href="#top" aria-label="图像处理首页"><span class="brand-mark" aria-hidden="true"></span></a>
+    <nav class="top-actions" aria-label="课程资料">
+      <a href="course-package.zip">资料 ZIP</a>
+      <a href="syllabus.md">课表</a>
+      <a href="handbook.md">讲义 MD</a>
+      <a class="button small" href="handbook.pdf">讲义 PDF</a>
     </nav>
   </header>
 
   <div class="layout" id="top">
     <aside class="sidebar">
-      <p class="sidebar-label">课程目录</p>
-      <nav aria-label="九个学习主题">
-        <a href="#topic-0">00　成像与坐标</a>
-        <a href="#topic-1">01　灰度化</a>
-        <a href="#topic-2">02　二值化</a>
-        <a href="#topic-3">03　图像减量</a>
-        <a href="#topic-4">04　去噪与修复</a>
-        <a href="#topic-5">05　边线提取</a>
-        <a href="#topic-6">06　中线与透视</a>
-        <a href="#topic-7">07　元素与稳定性</a>
-        <a href="#topic-8">08　上板与调试</a>
-        <a href="#sources">资料来源</a>
+      <nav aria-label="图像处理目录">
+        <p class="nav-group">灰度与阈值</p>
+        <a href="#pixels">灰度帧与像素</a>
+        <a href="#ratio">灰度差与差比和</a>
+        <a href="#threshold">固定阈值 / Otsu</a>
+        <p class="nav-group">图像处理</p>
+        <a href="#sampling-lab">降采样实验</a>
+        <a href="#sampling">降采样与滤波</a>
+        <a href="#sobel">Sobel / 边缘</a>
+        <p class="nav-group">扫线与透视</p>
+        <a href="#scanning">三类扫线方式</a>
+        <a href="#neighbor">八邻域 / 迷宫</a>
+        <a href="#ipm">逆透视 IPM</a>
+        <p class="nav-group">C 实验</p>
+        <a href="#c-lab">编译、回放、缓冲</a>
+        <a href="#sources">原始资料</a>
       </nav>
-      <div class="sidebar-note">
-        <span class="status-dot" aria-hidden="true"></span>
-        <span>9 主题 · 6 次课 · 320 分钟</span>
-      </div>
     </aside>
 
     <main id="main">
       <section class="hero" aria-labelledby="hero-title">
-        <div class="hero-copy">
-          <p class="eyebrow">镜头车 · 新生训练</p>
-          <h1 id="hero-title">把像素变成<br><em>行驶线索</em></h1>
-          <p class="hero-text">从摄像头的一格亮度开始，逐步得到左右边界、中线和可调试的视觉输出。每章都并列比较基础、进阶与横向方法。</p>
-          <div class="hero-meta">
-            <span>先看图</span><span>再算像素</span><span>最后上板</span>
-          </div>
-          <a class="button" href="#route">沿学习路线开始 <span aria-hidden="true">↓</span></a>
-        </div>
-        <figure class="hero-figure">
-          <img src="assets/figures/fig01_coordinates.svg" alt="车前地面经相机透视投影到图像，图像列向右、行向下">
-          <figcaption>第一件事：分清图像坐标和车体坐标。</figcaption>
+        <h1 id="hero-title">图像处理</h1>
+        <figure class="hero-image">
+          <img src="assets/c-pipeline.png" alt="灰度输入、阈值、差比和、Sobel、扫线和逆透视的 C 仿真结果">
         </figure>
       </section>
 
       <section class="route-section" id="route" aria-labelledby="route-title">
-        <div class="section-kicker"><span>路线图</span><span>01 / 09</span></div>
-        <h2 id="route-title">从光线到控制接口</h2>
-        <p class="section-lead">数据经过每一站都会少一些信息。每一步都要知道输入、输出，以及下一站还需要什么。</p>
+        <div class="section-kicker"><span>学习路线</span><span>灰度图像 → 可解释像素特征</span></div>
+        <h2 id="route-title">从一个灰度数组开始</h2>
+        <p class="section-lead">本教程从总钻风灰度帧开始。每个概念都用小矩阵手算，用 C99 看数据如何变化，再用同一帧比较方法。课程脉络参考 <a href="https://blog.csdn.net/qq_58114029/article/details/131879413">Joshua.Xu 开源系列总目录</a>，这里只选图像处理内容。</p>
         <div class="route">
-          <div><b>01</b><span>相机成像</span></div><i aria-hidden="true">→</i>
-          <div><b>02</b><span>灰度与阈值</span></div><i aria-hidden="true">→</i>
-          <div><b>03</b><span>滤波与边界</span></div><i aria-hidden="true">→</i>
-          <div><b>04</b><span>中线与事件</span></div><i aria-hidden="true">→</i>
-          <div><b>05</b><span>板上输出</span></div>
+          <div><b>01</b><span>读 GRAY8</span></div><i aria-hidden="true">→</i>
+          <div><b>02</b><span>比较灰度</span></div><i aria-hidden="true">→</i>
+          <div><b>03</b><span>掩码 / 梯度</span></div><i aria-hidden="true">→</i>
+          <div><b>04</b><span>边界 / 扫线</span></div><i aria-hidden="true">→</i>
+          <div><b>05</b><span>鸟瞰图像</span></div>
         </div>
         <div class="scope-note">
-          <strong>适用范围</strong>
-          <p>按通用单目摄像头循迹设计。具体届次、组别、相机、主控、限高与赛道元素没有由实验室提供；开课前对照组委会最终规则复核。练习图均由程序生成，不代表真实赛场。</p>
+          <strong>课堂默认</strong>
+          <p>据实验室提供的信息，以总钻风灰度输出作教学背景；具体型号、分辨率、帧缓冲符号和组别限制仍以实验室驱动及当年最终规则为准。正文只讲单通道灰度图像处理。所有 C 仿真帧由程序生成。</p>
         </div>
       </section>
 
-      <section class="lab-section" id="threshold-lab" aria-labelledby="threshold-title">
-        <div class="section-kicker"><span>互动实验 01</span><span>二值化</span></div>
-        <h2 id="threshold-title">拖动阈值，看前景如何改变</h2>
-        <p class="section-lead">左边是合成灰度帧；右边把低于阈值的暗像素标成白色前景。改变场景或阈值，观察阴影和反光怎样干扰固定阈值。</p>
+      <section class="lab-section" id="gray-lab" aria-labelledby="gray-lab-title">
+        <div class="section-kicker"><span>互动实验 01</span><span>固定 / Otsu / 逐行 / 局部</span></div>
+        <h2 id="gray-lab-title">看一帧非理想灰度图怎样二值化</h2>
+        <p class="section-lead">路面有渐变、局部阴影、反光和噪点。选择阈值算法后，左侧看 GRAY8，右侧看白色前景掩码；直方图标出当前全局阈值。</p>
         <div class="controls">
-          <label for="scene-select">输入场景
+          <label for="scene-select">灰度场景
             <select id="scene-select">
-              <option value="normal">正常直道</option>
+              <option value="normal">渐变直道</option>
               <option value="shadow">局部阴影</option>
-              <option value="glare">局部反光</option>
-              <option value="noise">椒盐噪点</option>
-              <option value="missing">左边线缺失</option>
-              <option value="curve">急弯</option>
+              <option value="glare">局部高光</option>
+              <option value="noise">孤立噪点</option>
+              <option value="missing">一侧边线变弱</option>
+              <option value="curve">弯道</option>
+            </select>
+          </label>
+          <label for="threshold-mode">阈值方法
+            <select id="threshold-mode">
+              <option value="fixed">固定全局 T</option>
+              <option value="otsu">Otsu 大津</option>
+              <option value="row">逐行双均值</option>
+              <option value="local">局部均值阈值</option>
             </select>
           </label>
           <label class="range-control" for="threshold-slider">
-            <span>阈值 T：<output id="threshold-value" for="threshold-slider">65</output></span>
-            <input id="threshold-slider" type="range" min="10" max="230" step="1" value="65">
+            <span><output id="threshold-label">T</output>：<output id="threshold-value">128</output></span>
+            <input id="threshold-slider" type="range" min="20" max="230" value="128" step="1">
           </label>
         </div>
         <div class="canvas-pair">
-          <figure><figcaption>灰度输入 · 160 × 120</figcaption><canvas id="gray-canvas" width="480" height="360" role="img" aria-label="生成的灰度赛道输入画面"></canvas></figure>
-          <figure><figcaption>二值结果 · 白色 = 暗前景</figcaption><canvas id="binary-canvas" width="480" height="360" role="img" aria-label="依据当前阈值分出的二值前景结果"></canvas></figure>
+          <figure><figcaption>灰度输入 · 160 × 120</figcaption><canvas id="gray-canvas" width="480" height="360" role="img" aria-label="合成的单通道灰度赛道帧"></canvas></figure>
+          <figure><figcaption>掩码 · 白色代表亮路面前景</figcaption><canvas id="threshold-canvas" width="480" height="360" role="img" aria-label="所选阈值算法输出的二值掩码"></canvas></figure>
         </div>
-        <p class="live-result" id="threshold-status" aria-live="polite">暗前景像素：—</p>
-        <p class="experiment-hint">如果阈值太低，边线不出现；太高时赛道内部或阴影也可能变成前景。真实参数要用目标相机采集帧标定。</p>
+        <figure class="chart-figure"><figcaption>当前场景 0..255 直方图</figcaption><canvas id="histogram-canvas" width="960" height="220" role="img" aria-label="灰度频数直方图和阈值位置"></canvas></figure>
+        <p class="live-result" id="threshold-status" aria-live="polite">阈值/前景：—</p>
+        <p class="experiment-hint">观察直方图两类重叠、阴影使全局阈值偏移，以及局部窗口过小时掩码随噪点跳变。示例参数不是总钻风推荐配置。</p>
       </section>
 
-      <section class="lab-section" id="compression-lab" aria-labelledby="compression-title">
-        <div class="section-kicker"><span>互动实验 02</span><span>降采样与 RAM</span></div>
-        <h2 id="compression-title">降低分辨率，检查窄边线</h2>
-        <p class="section-lead">右图先缩小再放大显示，便于看见降采样损失。数字只按图像尺寸与位宽计算，不代表目标板实际可用 RAM。</p>
+      <section class="lab-section" id="sampling-lab" aria-labelledby="sampling-lab-title">
+        <div class="section-kicker"><span>互动实验 02</span><span>空间采样 / RAM</span></div>
+        <h2 id="sampling-lab-title">降采样时，细线从哪一步消失</h2>
+        <p class="section-lead">右侧把低分辨率数组用最近邻放大显示。改变宽高比例，比较边界连续性和灰度缓冲字节数。</p>
         <div class="controls">
           <label class="range-control" for="scale-slider">
-            <span>保留宽高：<output id="scale-value" for="scale-slider">50%</output></span>
+            <span>保留宽高：<output id="scale-value">50%</output></span>
             <input id="scale-slider" type="range" min="25" max="100" step="5" value="50">
           </label>
         </div>
         <div class="canvas-pair">
-          <figure><figcaption>原始灰度 · 256 × 160</figcaption><canvas class="wide-canvas" id="full-canvas" width="512" height="320" role="img" aria-label="256乘160原始合成灰度赛道帧"></canvas></figure>
-          <figure><figcaption>降采样后放大 · 最近邻显示</figcaption><canvas class="wide-canvas" id="scaled-canvas" width="512" height="320" role="img" aria-label="缩小后放大的低分辨率灰度赛道帧"></canvas></figure>
+          <figure><figcaption>原始灰度 · 256 × 160</figcaption><canvas class="wide-canvas" id="full-canvas" width="512" height="320" role="img" aria-label="256乘160原始合成灰度图"></canvas></figure>
+          <figure><figcaption>缩小后最近邻放大</figcaption><canvas class="wide-canvas" id="scaled-canvas" width="512" height="320" role="img" aria-label="降采样后重新放大的灰度图"></canvas></figure>
         </div>
         <div class="memory-readout" aria-live="polite">
-          <div><span>缩放后尺寸</span><strong id="scaled-size">—</strong></div>
-          <div><span>灰度 uint8 缓冲</span><strong id="gray-bytes">—</strong></div>
-          <div><span>同尺寸二值位打包</span><strong id="packed-bytes">—</strong></div>
+          <div><span>降采样尺寸</span><strong id="scaled-size">—</strong></div>
+          <div><span>GRAY8 缓冲</span><strong id="gray-bytes">—</strong></div>
+          <div><span>同尺寸 1-bit 掩码</span><strong id="packed-bytes">—</strong></div>
         </div>
-        <p class="experiment-hint">ROI/降采样减少空间像素；位打包减少每像素位数；PNG/JPEG 改变文件表示。三者对细节、RAM 和计算的影响不同。</p>
+        <p class="experiment-hint">ROI/降采样减少像素位置；位打包减少每像素存储位数；PNG/JPEG 改变文件表示。三种操作不等价。</p>
       </section>
 
-      <article class="lesson" id="topic-0" aria-labelledby="t0">
-        <div class="section-kicker"><span>主题 00</span><span>数组与坐标</span></div>
-        <h2 id="t0">先知道每个像素在哪里</h2>
-        <p class="section-lead">程序访问 <code>img[y, x]</code>：x 是列，向右增加；y 是行，向下增加。图像上方通常看到更远处，但距离不是按行线性增长。</p>
-        <figure class="lesson-figure"><img src="assets/figures/fig01_coordinates.svg" alt="说明图像行列坐标与车体前方坐标不同，透视让行间地面距离不均匀"><figcaption>图 1 · 图像索引不是车体米制坐标。</figcaption></figure>
-        <div class="method-grid">
-          <section class="method"><p class="level">基础算法</p><h3>数组与 ROI</h3><p>读出 H×W×C、dtype 和行跨度，再裁出感兴趣区域。输入整帧，输出需要的像素范围；运算量由 HW 降到 HrWr。</p></section>
-          <section class="method"><p class="level">进阶算法</p><h3>曝光与视野标定</h3><p>看直方图是否压在黑/白端；用已知地面距离和画面位置测视野。饱和剪裁或严重模糊丢掉的信息不能靠改阈值恢复。</p></section>
-          <section class="method"><p class="level">横向扩展</p><h3>Bayer、YUV、灰度传感器</h3><p>检查传感器原始格式、通道顺序、行跨度和字节序。Y 平面或灰度输出可跳过颜色变换；需要颜色特征时灰度会丢信息。</p></section>
+      <section class="lab-section" id="ratio-lab" aria-labelledby="ratio-lab-title">
+        <div class="section-kicker"><span>互动实验 03</span><span>相邻灰度变化</span></div>
+        <h2 id="ratio-lab-title">差比和：亮度跳变有多强</h2>
+        <p class="section-lead">改变取样间隔和 Q7 阈值，观察道路边界、阴影边缘和噪点会不会都被当成边界候选。</p>
+        <div class="controls">
+          <label class="range-control" for="ratio-gap">
+            <span>横向取样间隔 δ：<output id="ratio-gap-value">3</output> 像素</span>
+            <input id="ratio-gap" type="range" min="1" max="10" value="3" step="1">
+          </label>
+          <label class="range-control" for="ratio-threshold">
+            <span>Q7 阈值：<output id="ratio-threshold-value">24</output></span>
+            <input id="ratio-threshold" type="range" min="1" max="100" value="24" step="1">
+          </label>
         </div>
-        <details class="limits"><summary>失效条件与资源</summary><p>曝光、畸变、相机安装角度、运动模糊和视野范围都会改变图像。8-bit 灰度缓冲需要 HW 字节；具体赛制限高每年每组核验。</p></details>
-        <p class="refs">资料：<a href="https://docs.opencv.org/4.12.0/d5/d98/tutorial_mat_operations.html">OpenCV 图像数组与灰度操作</a> · <a href="https://modelers.csdn.net/69a7a1ea7bbde9200b9d5b64.html">CSDN 历史镜头经验</a></p>
+        <div class="canvas-pair">
+          <figure><figcaption>原灰度图</figcaption><canvas id="ratio-input" width="480" height="360" role="img" aria-label="差比和演示输入灰度图"></canvas></figure>
+          <figure><figcaption>差比和候选跳变</figcaption><canvas id="ratio-output" width="480" height="360" role="img" aria-label="差比和阈值后的灰度边界候选"></canvas></figure>
+        </div>
+        <div class="formula-note">
+          <strong>Q7 = |a-b| × 128 / (a+b+1)</strong>
+          <span>加 1 防止 a=b=0 除零；保留 signed 版本可判断亮到暗/暗到亮方向。</span>
+        </div>
+        <p class="live-result" id="ratio-status" aria-live="polite">候选像素：—</p>
+      </section>
+
+      <section class="lab-section" id="sobel-lab" aria-labelledby="sobel-lab-title">
+        <div class="section-kicker"><span>互动实验 04</span><span>一阶梯度</span></div>
+        <h2 id="sobel-lab-title">移动 Sobel 阈值，观察弱边与噪点</h2>
+        <p class="section-lead">Gx 看水平方向灰度变化，Gy 看竖直方向变化。两方向都算出后再得到幅值，才能在弯边上观察完整边缘。</p>
+        <div class="controls">
+          <label for="sobel-channel">显示结果
+            <select id="sobel-channel">
+              <option value="magnitude">幅值 |Gx|+|Gy|</option>
+              <option value="gx">X 方向 |Gx|</option>
+              <option value="gy">Y 方向 |Gy|</option>
+              <option value="edges">阈值化边缘</option>
+            </select>
+          </label>
+          <label class="range-control" for="sobel-threshold">
+            <span>边缘阈值：<output id="sobel-value">70</output></span>
+            <input id="sobel-threshold" type="range" min="5" max="240" value="70" step="1">
+          </label>
+        </div>
+        <div class="canvas-pair">
+          <figure><figcaption>输入 GRAY8</figcaption><canvas id="sobel-input" width="480" height="360" role="img" aria-label="Sobel 实验灰度输入"></canvas></figure>
+          <figure><figcaption>当前梯度 / 边缘结果</figcaption><canvas id="sobel-output" width="480" height="360" role="img" aria-label="当前 Sobel 通道图或二值边缘图"></canvas></figure>
+        </div>
+        <p class="live-result" id="sobel-status" aria-live="polite">边缘像素：—</p>
+      </section>
+
+      <section class="lab-section" id="scan-lab" aria-labelledby="scan-lab-title">
+        <div class="section-kicker"><span>互动实验 05</span><span>扫线仿真</span></div>
+        <h2 id="scan-lab-title">同一帧比较三种 C 扫线起点</h2>
+        <p class="section-lead">这组模拟在一个白路面/黑背景掩码上显示水平扫线、双最长白列和中线继承。滑动到不同图像行，可以看种子位置怎么影响左右边界。</p>
+        <div class="controls">
+          <label for="scan-mode">扫线方式
+            <select id="scan-mode">
+              <option value="row">逐行从图像中间扫</option>
+              <option value="longest">双最长白列定种子</option>
+              <option value="inherit">近端中线继承</option>
+            </select>
+          </label>
+          <label class="range-control" for="scan-row">
+            <span>查看行 y：<output id="scan-row-value">96</output></span>
+            <input id="scan-row" type="range" min="3" max="116" value="96" step="1">
+          </label>
+        </div>
+        <div class="canvas-pair">
+          <figure><figcaption>二值道路区域</figcaption><canvas id="scan-mask" width="480" height="360" role="img" aria-label="白色道路区域及当前扫描行"></canvas></figure>
+          <figure><figcaption>边界和起点</figcaption><canvas id="scan-result" width="480" height="360" role="img" aria-label="所选扫线方法找到的左右边界与中线"></canvas></figure>
+        </div>
+        <p class="live-result" id="scan-status" aria-live="polite">扫描结果：—</p>
+      </section>
+
+      <section class="lab-section" id="neighbor-lab" aria-labelledby="neighbor-lab-title">
+        <div class="section-kicker"><span>互动实验 06</span><span>方向状态</span></div>
+        <h2 id="neighbor-lab-title">八邻域每走一步，都记录坐标和方向</h2>
+        <p class="section-lead">逐步增加已访问步数，看相同掩码上的路径如何延伸；终点、断线、回到同一状态和最大步数都必须有停止条件。</p>
+        <div class="controls">
+          <label class="range-control" for="neighbor-steps">
+            <span>访问步数：<output id="neighbor-steps-value">0</output></span>
+            <input id="neighbor-steps" type="range" min="0" max="24" value="0" step="1">
+          </label>
+        </div>
+        <div class="canvas-pair">
+          <figure><figcaption>局部边界像素</figcaption><canvas id="neighbor-canvas" width="480" height="300" role="img" aria-label="八邻域边界路径逐步显示"></canvas></figure>
+          <div class="definition-list">
+            <p><strong>状态</strong> = (x, y, 进入方向)</p>
+            <p><strong>访问顺序</strong> N → NE → E → SE → S → SW → W → NW</p>
+            <p><strong>停止</strong>重复状态、无邻点或超过步数上限</p>
+          </div>
+        </div>
+        <p class="live-result" id="neighbor-status" aria-live="polite">路径步数：0</p>
+      </section>
+
+      <section class="lab-section" id="ipm-lab" aria-labelledby="ipm-lab-title">
+        <div class="section-kicker"><span>互动实验 07</span><span>单应矩阵</span></div>
+        <h2 id="ipm-lab-title">拖动地平线宽度，观察逆透视 IPM</h2>
+        <p class="section-lead">左图标记地面四个对应点；右图对每个目标像素用 H 的逆矩阵找回原图取样坐标。改变远端四边形宽度会改映射比例。</p>
+        <div class="controls">
+          <label class="range-control" for="ipm-top-width">
+            <span>远端宽度：<output id="ipm-width-value">46%</output></span>
+            <input id="ipm-top-width" type="range" min="22" max="72" value="46" step="1">
+          </label>
+        </div>
+        <div class="canvas-pair">
+          <figure><figcaption>相机灰度图与四个标定点</figcaption><canvas id="ipm-input" width="480" height="360" role="img" aria-label="透视灰度车道和四个地面标定点"></canvas></figure>
+          <figure><figcaption>IPM 鸟瞰灰度图</figcaption><canvas id="ipm-output" width="480" height="360" role="img" aria-label="单应矩阵逆映射后的俯视灰度图"></canvas></figure>
+        </div>
+        <p class="live-result" id="ipm-status" aria-live="polite">四对点 → 8 个自由参数；单应矩阵归一化 H[2][2]=1</p>
+      </section>
+
+      <article class="lesson" id="pixels" aria-labelledby="pixels-title">
+        <div class="section-kicker"><span>灰度基础</span><span>定义 → 数组</span></div>
+        <h2 id="pixels-title">01｜一帧总钻风图像是什么</h2>
+        <p class="section-lead">传感器给出 H×W 个亮度样本。GRAY8 每个像素一个 0..255 的数。第一步不是二值化，而是确认帧尺寸、灰度范围、图像稳定性和坐标。</p>
+        <figure class="lesson-figure"><img src="assets/references/source-array-coordinates.png" alt="Joshua.Xu 博文中图像数组 y 行 x 列的坐标示意，原图保留水印"><figcaption>来源图：Joshua.Xu 图像篇，CC BY-SA 4.0，原图未改。</figcaption></figure>
+        <figure class="lesson-figure"><img src="assets/references/source-gray-levels.jpeg" alt="从黑到白对应0到255灰度值的亮度条，来自 Joshua.Xu 图像篇"><figcaption>来源图：Joshua.Xu 图像篇，CC BY-SA 4.0，原图未改。它展示 8-bit 灰度层次，不是彩色转灰度流程。</figcaption></figure>
+        <div class="method-grid">
+          <section class="method"><p class="level">基础</p><h3>GRAY8 与 y/x</h3><p>读 gray[y][x]：先行后列；左上是 (0,0)。把 3×4 像素写在纸上，把0/255和中间值分开标注。</p></section>
+          <section class="method"><p class="level">进阶</p><h3>曝光、失焦和暗角</h3><p>看原始灰度图与分行直方图。黑/白剪裁或运动模糊丢掉的边界，阈值/扫线无法凭空恢复。</p></section>
+          <section class="method"><p class="level">横向扩展</p><h3>帧标志、数组所有权</h3><p>驱动报告一帧就绪后再处理；确认 DMA 不会在处理时覆盖数组。单缓冲须用驱动保证的稳定时段或复制快照。</p></section>
+        </div>
+        <details class="limits"><summary>C 语言：打印一小块灰度</summary><pre><code>for (int y = 0; y &lt; 4; ++y) {
+    for (int x = 0; x &lt; 5; ++x)
+        printf("%3u ", (unsigned)gray[y][x]);
+    putchar('\n');
+}</code></pre><p>循环变量 y 是行，x 是列。二维 C 数组按行连续存储；有效下标范围必须是 y&lt;H 且 x&lt;W。</p></details>
+        <p class="refs">参考：<a href="https://blog.csdn.net/qq_58114029/article/details/132006971">Joshua.Xu 摄像头篇</a> · <a href="https://blog.csdn.net/qq_58114029/article/details/132050763">图像篇</a> · <a href="https://docs.opencv.org/4.12.0/d5/d98/tutorial_mat_operations.html">OpenCV 图像矩阵与 ROI</a></p>
       </article>
 
-      <article class="lesson" id="topic-1" aria-labelledby="t1">
-        <div class="section-kicker"><span>主题 01</span><span>单通道亮度</span></div>
-        <h2 id="t1">灰度化：简化颜色，保留层次</h2>
-        <p class="section-lead">8-bit 灰度还有 256 个亮度级别。它不是黑白图，只是每个像素从多通道变成一个亮度值。</p>
-        <figure class="lesson-figure"><img src="assets/figures/fig02_rgb_gray_binary.svg" alt="RGB像素阵列、灰度阵列与阈值后二值阵列的并列示意"><figcaption>图 2 · 灰度保留亮度，二值只保留类别。</figcaption></figure>
+      <article class="lesson" id="ratio" aria-labelledby="ratio-title">
+        <div class="section-kicker"><span>灰度差异</span><span>邻点 → 跳变</span></div>
+        <h2 id="ratio-title">02｜相邻像素：差值与差比和</h2>
+        <p class="section-lead">边界是空间上的亮度变化。差分看变化方向；差比和把差异除以局部亮度尺度，在总体变亮/变暗时有机会保持较稳定的响应。</p>
+        <figure class="lesson-figure"><img src="assets/figures/fig10_difference_ratio.svg" alt="两组灰度邻点的差比和结果比较和Q7范围"></figure>
         <div class="method-grid">
-          <section class="method"><p class="level">基础算法</p><h3>加权 RGB</h3><p>Y≈0.299R+0.587G+0.114B。RGB=(100,150,200) 得约 141。OpenCV 彩色输入常用 BGR 顺序，不能把通道名写反。</p></section>
-          <section class="method"><p class="level">进阶算法</p><h3>伽马与 CLAHE</h3><p>伽马改变暗/亮区域的映射；局部直方图增强可增加对比，却会放大噪点。两者都不能找回已饱和或未采到的细节。</p></section>
-          <section class="method"><p class="level">横向扩展</p><h3>直接取 Y 或灰度输出</h3><p>若摄像头已有 Y 平面/灰度格式，可少做一次转换；同亮度不同颜色的赛道标记也会因此无法区分。</p></section>
+          <section class="method"><p class="level">基础</p><h3>绝对灰度差</h3><p>d=|a−b|。两点 205 和48，相差157；20和22，相差2。对比间隔 δ=1、2、4，观察边线变宽对检测的影响。</p></section>
+          <section class="method"><p class="level">进阶</p><h3>Q7 差比和</h3><p>R=⌊128×|a−b|/(a+b+1)⌋，结果约0..128。可以用 signed (a−b) 保留由亮到暗的方向。</p></section>
+          <section class="method"><p class="level">横向</p><h3>多间隔差分与局部方差</h3><p>短间隔定位锐边；较长间隔增加渐变边灵敏度。方差可辅助排除平坦噪声；运算多一些，也可能把纹理当边界。</p></section>
         </div>
-        <details class="limits"><summary>失效条件与资源</summary><p>灰度适合亮度差异明显的边线；彩色材料可能在灰度后混淆。RGB888 需要 3HW 字节，灰度需要 HW 字节；逐像素变换为 O(HW)。</p></details>
-        <p class="refs">资料：<a href="https://docs.opencv.org/4.12.0/d5/d98/tutorial_mat_operations.html">OpenCV Operations with images</a></p>
+        <details class="limits"><summary>C 实现：避免除零、避免负数左移</summary><pre><code>uint8_t ratio_q7(uint8_t a, uint8_t b) {
+    int32_t d = (int32_t)a - (int32_t)b;
+    if (d &lt; 0) d = -d;
+    return (uint8_t)((d * 128) / ((int32_t)a + b + 1));
+}</code></pre><p>乘法用有符号32位中间量；分母加1；不要写负数左移，C 标准不保证那种写法的行为。</p></details>
+        <p class="refs">算法线索：<a href="https://avoid.overfit.cn/post/00bee2fcb54047edb58a4ea56ee1314a">灰度差比和经验文章</a>（授权未核验；本课仅链接并独立重写算法），<a href="https://blog.csdn.net/qq_58114029/article/details/132050763">Joshua.Xu 图像篇</a></p>
       </article>
 
-      <article class="lesson" id="topic-2" aria-labelledby="t2">
-        <div class="section-kicker"><span>主题 02</span><span>前景 / 背景</span></div>
-        <h2 id="t2">黑白二值化：定义好前景极性</h2>
-        <p class="section-lead">本文统一用白色前景显示暗边线，条件是 I≤T。二值图只有两类，不再包含原始亮度强弱。</p>
-        <figure class="lesson-figure"><img src="assets/figures/fig03_histogram_threshold.svg" alt="有两个亮度峰的直方图和候选分界阈值线"><figcaption>图 3 · 双峰间的阈值有机会同时分开两类。</figcaption></figure>
+      <article class="lesson" id="threshold" aria-labelledby="threshold-title">
+        <div class="section-kicker"><span>阈值与分割</span><span>固定 → 全局自适应 → 局部</span></div>
+        <h2 id="threshold-title">03｜阈值不是魔法数字</h2>
+        <p class="section-lead">亮路面白前景的约定为 I≥T。阈值要和当前灰度直方图、输入极性、窗口大小一起解释。</p>
+        <figure class="lesson-figure"><img src="assets/figures/fig03_histogram_threshold.svg" alt="暗背景和亮路面两个直方峰及全局阈值"></figure>
         <div class="method-grid">
-          <section class="method"><p class="level">基础算法</p><h3>固定阈值</h3><p>逐像素判断 I≤T。T=100 时，99 是前景，101 是背景。输入灰度图和一个数，输出二值掩码；直观但怕光照整体变化。</p></section>
-          <section class="method"><p class="level">进阶算法</p><h3>Otsu / 自适应阈值</h3><p>Otsu 从直方图选全局类间分割；局部均值法每个窗口使用不同 T。一个适合双峰，另一个适合缓慢变化光照；局部窗口要权衡噪声与阴影。</p></section>
-          <section class="method"><p class="level">横向扩展</p><h3>迭代双均值 / 时序 / 判点</h3><p>迭代更新亮暗两组均值中点；时序方法限制相邻帧阈值变化；若仅需少数行可按需比较局部灰度，不必保存整幅二值图。</p></section>
+          <section class="method"><p class="level">基础</p><h3>固定全局 T</h3><p>优点是每个像素只比较一次。阴影区会漏掉亮路面，高光/噪点也可能扩大片前景。</p></section>
+          <section class="method"><p class="level">进阶</p><h3>Otsu 最大类间方差</h3><p>先统计 256 桶，再测试 0..254 的候选值，最大化 w0·w1·(μ0−μ1)²。适合整幅图能被分成两团的输入，不自动解决阴影。</p></section>
+          <section class="method"><p class="level">横向</p><h3>迭代双均值 / 逐行 / 局部均值</h3><p>迭代更新两类均值中点；逐行大津适应前后亮度缓变；局部均值用窗口与偏置 C，适合局部不均光，但窗口和边界处理要调。</p></section>
         </div>
-        <details class="limits"><summary>失效条件与资源</summary><p>阴影、反光、污渍、前景方向写反、非双峰直方图都可能使分割出错。逐像素法 O(HW)；朴素局部窗口 O(HWk²)，积分图可降到 O(HW) 并增加缓冲。</p></details>
-        <p class="refs">资料：<a href="https://docs.opencv.org/4.12.0/d7/d4d/tutorial_py_thresholding.html">OpenCV Image Thresholding</a> · <a href="https://blog.csdn.net/zhuoqingjoking97298/article/details/126573548">第 17 届二值化实践个案</a></p>
+        <details class="limits"><summary>3×3 Otsu 手算</summary><p>灰度 {20,22,30,34,200,210,218,220,224}。候选 T=34 将前4个归低类，后5个归高类；记 w0/w1、两类均值，计算类间方差。把 T 从0逐个扫至254并取最大值，就是 Otsu 的程序过程。若两类混在一起或一类为空，输出不可靠。</p></details>
+        <p class="refs">参考：<a href="https://blog.csdn.net/qq_58114029/article/details/132050763">Joshua.Xu 图像篇 / 大津</a> · <a href="https://docs.opencv.org/4.12.0/d7/d4d/tutorial_py_thresholding.html">OpenCV Otsu 与 adaptiveThreshold</a></p>
       </article>
 
-      <article class="lesson" id="topic-3" aria-labelledby="t3">
-        <div class="section-kicker"><span>主题 03</span><span>像素数 / 像素位数 / 文件</span></div>
-        <h2 id="t3">图像减量：三种“压缩”分开算</h2>
-        <p class="section-lead">空间裁剪、位打包和 PNG/JPEG 编码改变的是不同东西。先确认瓶颈是视野像素、RAM 还是传输字节。</p>
-        <figure class="lesson-figure"><img src="assets/figures/fig04_compression_ram.svg" alt="左侧演示裁剪和降采样减少空间像素，右侧演示二值位打包与文件编码"><figcaption>图 4 · 像素数量、位宽、文件表示分开考虑。</figcaption></figure>
+      <article class="lesson" id="sampling" aria-labelledby="sampling-title">
+        <div class="section-kicker"><span>减量与滤波</span><span>采样 / 缓冲 / 噪声</span></div>
+        <h2 id="sampling-title">04｜少存一点，别把边线采没了</h2>
+        <p class="section-lead">“压缩”可能指减少空间采样、缩短像素位宽或压缩文件编码。先说明改变的是哪一种。</p>
+        <figure class="lesson-figure"><img src="assets/figures/fig04_compression_ram.svg" alt="ROI和降采样改变像素数，位打包改变每个像素的存储位数"></figure>
         <div class="method-grid">
-          <section class="method"><p class="level">基础算法</p><h3>裁剪与降采样</h3><p>裁剪 ROI 或隔点取样减少像素数量；160×120 缩到 80×60，像素数变四分之一。会丢掉画外信息或窄边线。</p></section>
-          <section class="method"><p class="level">进阶算法</p><h3>位打包与行缓存</h3><p>uint8 的 0/1 仍每像素 1 byte；8 个二值点按 bit 打包才约省 8 倍。行缓存省 RAM，但同样像素仍需处理。</p></section>
-          <section class="method"><p class="level">横向扩展</p><h3>PNG / JPEG</h3><p>PNG 无损编码，JPEG 通常有损；改变文件/传输表示。解码后依然可能要一整幅原尺寸工作缓冲。</p></section>
+          <section class="method"><p class="level">基础</p><h3>ROI、最近邻 2×</h3><p>只保留需要的图像区域，或每2×2取一个样本；80×48灰度为3840 B，40×24为960 B。窄线和远端细节会丢。</p></section>
+          <section class="method"><p class="level">进阶</p><h3>平均降采样、行缓冲</h3><p>小块均值减少锯齿；行缓存用于滤波只保留必要行。缩小插值更平滑，但可能把窄亮道均成灰色。</p></section>
+          <section class="method"><p class="level">横向</p><h3>位打包与文件编码</h3><p>二值uint8仍为1 B/像素；位打包8点/byte。PNG/JPEG是文件/传输编码，解码后仍可能要全幅缓冲。</p></section>
         </div>
-        <details class="limits"><summary>手算 RAM</summary><p>160×120 灰度 uint8 = 19,200 B；二值 uint8 也是 19,200 B；位打包为 ceil(19,200/8)=2,400 B。双缓冲乘 2；DMA、对齐、栈和其它模块还需另算。</p></details>
-        <p class="refs">资料：<a href="https://github.com/BiliLBD/USTB_Swan/blob/main/README.md">USTB_Swan 资源取舍记录</a> · <a href="https://docs.opencv.org/4.12.0/da/d6e/tutorial_py_geometric_transformations.html">OpenCV resize 与几何变换</a></p>
+        <figure class="lesson-figure"><img src="assets/figures/fig05_filtering.svg" alt="中值滤波去除一个孤立噪点"></figure>
+        <p>均值滤波抹平尖峰但模糊边；中值抑制椒盐点且保留阶跃较好；形态学开闭修复二值小洞/小点。核越大，改变的边线也越多。中值 C99 代码和 PGM 输出见 C 实验包。</p>
+        <p class="refs">参考：<a href="https://blog.csdn.net/qq_58114029/article/details/132050763">Joshua.Xu 图像篇 / 图像压缩</a> · <a href="https://docs.opencv.org/4.13.0/dc/dd3/tutorial_gausian_median_blur_bilateral_filter.html">OpenCV Smoothing Images</a></p>
       </article>
 
-      <article class="lesson" id="topic-4" aria-labelledby="t4">
-        <div class="section-kicker"><span>主题 04</span><span>降噪但不抹线</span></div>
-        <h2 id="t4">滤波和形态学：修噪声也会修掉目标</h2>
-        <p class="section-lead">先看噪声类型，再挑一个尽量小的算子。每次操作都要比较边线是否变细、断裂或连在一起。</p>
-        <figure class="lesson-figure"><img src="assets/figures/fig05_filtering.svg" alt="5乘5亮度网格中的一个红色孤立噪点经中值滤波被抑制"><figcaption>图 5 · 中值能压孤立尖峰，细线仍可能被抹掉。</figcaption></figure>
+      <article class="lesson" id="sobel" aria-labelledby="sobel-title">
+        <div class="section-kicker"><span>梯度与边缘</span><span>局部差分</span></div>
+        <h2 id="sobel-title">05｜Sobel：把灰度斜率算出来</h2>
+        <p class="section-lead">阈值看某点够不够亮；Sobel 看邻域亮度朝 x/y 方向变化多快。只显示梯度强度时会同时看到物体两侧边缘。</p>
+        <figure class="lesson-figure"><img src="assets/figures/fig11_sobel_kernel.svg" alt="3乘3 Sobel X核与垂直亮度阶跃的手算结果"></figure>
         <div class="method-grid">
-          <section class="method"><p class="level">基础算法</p><h3>均值 / 中值</h3><p>均值取邻域平均，平滑却模糊边缘；中值取邻域排序中间值，适合孤立椒盐噪点。</p></section>
-          <section class="method"><p class="level">进阶算法</p><h3>高斯与开闭运算</h3><p>高斯按距离赋权平滑；开运算先腐蚀后膨胀，去小白点；闭运算先膨胀后腐蚀，填小黑孔。</p></section>
-          <section class="method"><p class="level">横向扩展</p><h3>按噪声来源处理</h3><p>椒盐试中值，连续噪声试高斯，缓慢照明变化先改善曝光或阈值；长断线要靠时序/几何证据，而不是加大核。</p></section>
+          <section class="method"><p class="level">基础</p><h3>横向 / 纵向差分</h3><p>中心左右相减估 Gx，上下相减估 Gy。跳变越大，梯度幅值越大。</p></section>
+          <section class="method"><p class="level">进阶</p><h3>3×3 Sobel 卷积</h3><p>核 [-1 0 1; -2 0 2; -1 0 1] 估 Gx；转置核估 Gy。把乘加先放进 int16/int32，再取幅值并缩放。</p></section>
+          <section class="method"><p class="level">横向</p><h3>Scharr / Canny / 二阶导</h3><p>Scharr改核权重；Canny增加非极大值抑制和双阈值连边；Laplacian求二阶变化。结果仍是边缘候选，不是“哪条是赛道”的判断。</p></section>
         </div>
-        <details class="limits"><summary>资源和风险</summary><p>k×k 直接邻域遍历约 O(HWk²)；固定 k 时为 O(HW)。窗口比真实线宽大时可能抹线、拓宽或把左右边界连起来。</p></details>
-        <p class="refs">资料：<a href="https://docs.opencv.org/4.13.0/dc/dd3/tutorial_gausian_median_blur_bilateral_filter.html">OpenCV Smoothing Images</a></p>
+        <details class="limits"><summary>三行手算</summary><p>20 20 200 / 20 20 200 / 20 20 200：中心 Gx=180+360+180=720，Gy≈0。若只存 uint8，先缩放/截断，否则 720 会溢出或丢动态范围。</p></details>
+        <p class="refs">参考：<a href="https://blog.csdn.net/qq_58114029/article/details/132050763">Joshua.Xu 图像篇 / Sobel</a> · <a href="https://docs.opencv.org/4.12.0/d2/d2c/tutorial_sobel_derivatives.html">OpenCV Sobel</a> · <a href="https://docs.opencv.org/4.12.0/da/d5c/tutorial_canny_detector.html">OpenCV Canny</a></p>
       </article>
 
-      <article class="lesson" id="topic-5" aria-labelledby="t5">
-        <div class="section-kicker"><span>主题 05</span><span>从像素到坐标</span></div>
-        <h2 id="t5">边线提取：扫描、跟踪、筛候选</h2>
-        <p class="section-lead">二值图还不是路径。循迹常只需要若干行的左右坐标；八邻域还可以提供边线生长方向，但遇岔路、断点需要可靠停止规则。</p>
-        <figure class="lesson-figure"><img src="assets/figures/fig06_boundary.svg" alt="同一条赛道左图逐行从中点向外扫描，右图按固定顺序检查八个邻像素"><figcaption>图 6 · 扫描线每行独立；八邻域沿连接像素移动。</figcaption></figure>
+      <article class="lesson" id="scanning" aria-labelledby="scanning-title">
+        <div class="section-kicker"><span>扫线和边界</span><span>同一二值输入并列看</span></div>
+        <h2 id="scanning-title">06｜三种扫线：起点、方向、停止条件</h2>
+        <p class="section-lead">相机灰度完成阈值后，得到白路面/黑背景掩码。扫线把二维区域简化为一组边界坐标，但所有坐标都应带有效标志。</p>
+        <figure class="lesson-figure"><img src="assets/figures/fig12_scan_strategies.svg" alt="同一条灰度道路上逐行扫、双最长白列、中线继承和八邻域路径示意"></figure>
+        <figure class="lesson-figure"><img src="assets/references/source-longest-white-column.png" alt="Joshua.Xu 原始双最长白列说明图，CC BY-SA 4.0，保留原水印"><figcaption>来源图：Joshua.Xu 边线提取篇，CC BY-SA 4.0 原图未修改。课程重新讲解数组过程。</figcaption></figure>
         <div class="method-grid">
-          <section class="method"><p class="level">基础算法</p><h3>逐行左右扫描</h3><p>从图像中心向两侧找第一处阈值跳变，输出 L[y]、R[y] 和有效标志。易理解、易显示；杂点可能抢先被当成边线。</p></section>
-          <section class="method"><p class="level">进阶算法</p><h3>八邻域 / 迷宫式跟踪</h3><p>从种子按方向序检查八个相邻像素；记录像素与进入方向，遇岔路按约定选择，越界拒绝，重复状态或步数上限终止。</p></section>
-          <section class="method"><p class="level">横向扩展</p><h3>Canny / 连通域 / 轮廓</h3><p>Canny 输出梯度边缘，连通域按邻接分组，轮廓表达区域边界；还需用位置、面积和宽度筛出赛道候选。</p></section>
+          <section class="method"><p class="level">基础</p><h3>逐行横向扫</h3><p>在选定行从中心向左右找白→黑跳变，记录左白点、右白点与 valid。最简单，起点偏离道路时会找错。</p></section>
+          <section class="method"><p class="level">进阶</p><h3>双最长白列定种子</h3><p>从图像底边逐列向上数连续白点，左右各取最长列当种子；最长长度可作有效搜索截止行，不是物理距离。</p></section>
+          <section class="method"><p class="level">横向</p><h3>中线继承 / 灰度差分</h3><p>上行中点作为下一行起点；或直接对灰度比较间隔点差比和，跳过全幅二值中间图。保留 valid，设最大偏移防止漂走。</p></section>
         </div>
-        <details class="limits"><summary>八邻域顺序与失效点</summary><p>示例编号 N=0、NE=1、E=2、SE=3、S=4、SW=5、W=6、NW=7；方向顺序需固定。种子错、线断、岔路、贴边越界和闭环未终止都会出错。队伍开源个案中的方法取舍只适用于其输入与平台。</p></details>
-        <p class="refs">资料：<a href="https://github.com/BiliLBD/USTB_Swan/blob/main/README.md">USTB_Swan 图像处理记录</a> · <a href="https://docs.opencv.org/4.12.0/d4/d73/tutorial_py_contours_begin.html">OpenCV 轮廓教程</a> · <a href="https://damodev.csdn.net/6880a5f0bb9d8e0ecec2b1f8.html">CSDN 八邻域/迷宫法个案</a></p>
+        <details class="limits"><summary>边界模式和失败点</summary><p>亮路面约定下，左边界向左看“黑黑白”，右边界向右看“白黑黑”。若行内有噪声点、十字/环岛多分支、远端模糊，模式会产生假边。可记录白点连续长度、邻行一致性与失边数作为图像质量量。</p></details>
+        <p class="refs">参考：<a href="https://blog.csdn.net/qq_58114029/article/details/132132607">Joshua.Xu 边线提取篇</a> · <a href="https://github.com/BiliLBD/USTB_Swan/blob/main/README.md">USTB_Swan 团队实现取舍（历史个案）</a></p>
       </article>
 
-      <article class="lesson" id="topic-6" aria-labelledby="t6">
-        <div class="section-kicker"><span>主题 06</span><span>路径几何</span></div>
-        <h2 id="t6">中线与透视：从两条边变成目标</h2>
-        <p class="section-lead">同一行的左右边界可取中点；单边缺失时则需要经过标定的宽度模型，或投影到更好解释的鸟瞰平面。</p>
-        <figure class="lesson-figure"><img src="assets/figures/fig07_centerline.svg" alt="透视赛道的两条边线由同一行求中点得到中线"><figcaption>图 7 · 中点依赖两侧边界都正确。</figcaption></figure>
+      <article class="lesson" id="neighbor" aria-labelledby="neighbor-title">
+        <div class="section-kicker"><span>连通跟踪</span><span>有限状态遍历</span></div>
+        <h2 id="neighbor-title">07｜八邻域和迷宫法：沿相连像素走</h2>
+        <p class="section-lead">八邻域每次查看中心周围 8 格。它会沿边缘方向走，不再独立扫每行；优点是能保留方向，难点是种子、岔路、缺口和闭环。</p>
+        <figure class="lesson-figure"><img src="assets/figures/fig15_eight_neighbor_states.svg" alt="八邻域九宫格方向和坐标加进入方向构成的访问状态"></figure>
         <div class="method-grid">
-          <section class="method"><p class="level">基础算法</p><h3>双边取中点</h3><p>C[y]=(L[y]+R[y])/2。L=38、R=122 时中点 80。输出中线及有效行标记。</p></section>
-          <section class="method"><p class="level">进阶算法</p><h3>单边、拟合、前瞻</h3><p>按行标定半宽补单边；对有效点拟合 x(y)=ay²+by+c；从可信曲线选择前瞻点。离群点会带偏拟合。</p></section>
-          <section class="method"><p class="level">横向扩展</p><h3>鸟瞰单应变换</h3><p>四对地面对应点估计 3×3 单应矩阵，再重采样成鸟瞰图。直道宽度更易比较，但需要标定、内存和插值。</p></section>
+          <section class="method"><p class="level">基础</p><h3>逐行扫描给种子</h3><p>从近端行找到一个可靠边界像素；验证它的 8 个邻点中至少有前景邻点后才开始生长。</p></section>
+          <section class="method"><p class="level">进阶</p><h3>八邻域链码</h3><p>依固定方向顺序查看邻点，移动并更新进入方向；记录 (x,y,dir)，重复状态代表环回，步数上限保护程序。</p></section>
+          <section class="method"><p class="level">横向</p><h3>迷宫式墙跟随 / 连通域</h3><p>墙跟随让方向状态持续贴着同一侧边界；连通域则遍历所有连通点，适合先筛候选但内存可能 O(HW)。缺线时二者都不会凭空补线。</p></section>
         </div>
-        <details class="limits"><summary>输出接口</summary><p>建议接口携带 frame_id、center[y]、valid[y]、confidence 和 event_hint。无效时明确报告，不要静默伪造坐标；后续控制课程再决定如何使用。</p></details>
-        <p class="refs">资料：<a href="https://docs.opencv.org/4.12.0/da/d6e/tutorial_py_geometric_transformations.html">OpenCV Perspective Transformation</a> · <a href="https://github.com/BiliLBD/USTB_Swan/blob/main/README.md">USTB_Swan 逆透视工具说明</a></p>
+        <p>迷宫法不是“跑最短路的 BFS”。它是有边界跟随策略的局部遍历；左优先/右优先在分叉处结果不同。每个状态记录坐标与进入方向，并限制最多 H×W 步。C 模拟会把行走轨迹保存成 12_trace8.pgm，可逐格查看。</p>
+        <p class="refs">参考：<a href="https://blog.csdn.net/qq_58114029/article/details/132132607">Joshua.Xu 边线提取篇</a> · <a href="https://www.bilibili.com/video/BV1VN411N79B/">B 站八邻域教程（选学链接）</a>（视频内容未用作事实依据）</p>
       </article>
 
-      <article class="lesson" id="topic-7" aria-labelledby="t7">
-        <div class="section-kicker"><span>主题 07</span><span>几何与多帧证据</span></div>
-        <h2 id="t7">赛道元素：给单帧判断加上时间</h2>
-        <p class="section-lead">十字、环岛、坡道、断线或反光会让常规两边界假设暂时不成立。具体元素只在当前组别规则确认后纳入课程。</p>
-        <figure class="lesson-figure"><img src="assets/figures/fig09_failure_cases.svg" alt="四种合成场景：正常、阴影、反光和一侧断线加噪点"><figcaption>图 9 · 失败帧要与正常帧一起回放。</figcaption></figure>
+      <article class="lesson" id="ipm" aria-labelledby="ipm-title">
+        <div class="section-kicker"><span>几何变换</span><span>单应矩阵</span></div>
+        <h2 id="ipm-title">08｜IPM 逆透视：把道路映到鸟瞰平面</h2>
+        <p class="section-lead">地面道路可近似为一个平面。选四对平面对应点计算单应矩阵 H，才能让远近尺度更好比较；相机动过后必须重新标定。</p>
+        <figure class="lesson-figure"><img src="assets/figures/fig16_ipm_homography.svg" alt="四个源地面点通过3乘3单应矩阵映射至鸟瞰矩形"></figure>
         <div class="method-grid">
-          <section class="method"><p class="level">基础算法</p><h3>几何候选</h3><p>记录行宽、边线斜率、连续丢边长度和分支数，输出候选事件。先确认本届组别是否真的存在该元素。</p></section>
-          <section class="method"><p class="level">进阶算法</p><h3>多帧状态机与置信度</h3><p>FOLLOW→APPROACH→ENTER→PASS→EXIT；用连续帧和滞回确认，低置信度回退并设置超时。权重由实际数据标定。</p></section>
-          <section class="method"><p class="level">横向扩展</p><h3>时间滤波与允许的传感器</h3><p>短窗口中位数、指数平滑可缓和跳点；若规则和硬件允许，再融合编码器、IMU、颜色或目标识别。</p></section>
+          <section class="method"><p class="level">基础</p><h3>四点对应</h3><p>原图地面四角 (x,y) 对应俯视目标 (u,v)，每对点产生两条方程。H 有 8 个独立参数，尺度固定 H[2][2]=1。</p></section>
+          <section class="method"><p class="level">进阶</p><h3>逆向映射取样</h3><p>对每个目标像素反算源坐标，用最近邻或双线性读灰度，避免前向投影留下空洞。</p></section>
+          <section class="method"><p class="level">横向</p><h3>映射表 / 行变换</h3><p>提前存源坐标映射表能省每帧矩阵除法、但占 RAM/Flash；每行解析映射省表但增加算术。看图像尺寸后再选。</p></section>
         </div>
-        <details class="limits"><summary>失效边界</summary><p>出画、曝光跳变、坡道透视、缺边或状态机不复位都可能出错。没有成套场景帧就不报告“识别率”。</p></details>
-        <p class="refs">资料：<a href="https://aiot.csdn.net/6a82ced410ee7a33f29c1841.html">第 21 届规则组别线索</a> · <a href="https://github.com/SJTU-AuTop/Openart-Code/blob/main/README.md">SJTU AuTop OpenART</a> · <a href="https://www.bilibili.com/video/BV1jr421V7t1/">B 站状态机选学视频</a></p>
+        <details class="limits"><summary>手算一组平面射影关系</summary><p>若 H[2][2]=1，u=(h0x+h1y+h2)/(h6x+h7y+1)，v=(h3x+h4y+h5)/(h6x+h7y+1)。四对点给 8 个未知数；四点共线会使方程退化。C 文件给出高斯消元和逆矩阵仿真。</p></details>
+        <p class="refs">参考：<a href="https://blog.csdn.net/qq_58114029/article/details/132132607">Joshua.Xu 对 IPM 的说明</a> · <a href="https://docs.opencv.org/4.12.0/da/d6e/tutorial_py_geometric_transformations.html">OpenCV 透视变换接口</a> · <a href="https://github.com/BiliLBD/USTB_Swan/blob/main/README.md">USTB_Swan 逆透视标定工具线索</a></p>
       </article>
 
-      <article class="lesson" id="topic-8" aria-labelledby="t8">
-        <div class="section-kicker"><span>主题 08</span><span>可复现地上板</span></div>
-        <h2 id="t8">调试：找到第一个出错的步骤</h2>
-        <p class="section-lead">固定输入、保留中间结果、量清计算边界，才能比较 PC 处理和 MCU 实现。</p>
-        <figure class="lesson-figure"><img src="assets/figures/fig08_pipeline_memory.svg" alt="采集、分割、提边、拟合、输出接口的图像处理链与缓冲区估算"><figcaption>图 8 · 像素缓冲不是整机 RAM 的全部。</figcaption></figure>
+      <article class="lesson" id="c-lab" aria-labelledby="c-title">
+        <div class="section-kicker"><span>C99 实验</span><span>灰度输入 / PGM 输出</span></div>
+        <h2 id="c-title">09｜编译完整图像处理仿真</h2>
+        <p class="section-lead">程序自己生成有渐变、阴影、局部高光和噪点的 80×48 灰度帧，运行阈值、差比和、滤波、Sobel、扫线、八邻域和 IPM，并保存 19 张 PGM。</p>
+        <figure class="wide-figure"><img src="assets/c-pipeline.png" alt="C99 程序对同一张灰度合成帧生成19个中间处理结果"><figcaption>同一输入的 C 仿真输出总览。每个文件可以单独放大查看。</figcaption></figure>
         <div class="method-grid">
-          <section class="method"><p class="level">基础算法</p><h3>离线回放</h3><p>保存一组灰度输入，逐级导出灰度、二值、滤波、边线和中线；对照同一输入，定位第一个错误中间图。</p></section>
-          <section class="method"><p class="level">进阶算法</p><h3>时间与 RAM 预算</h3><p>目标板单独测帧处理边界；统计双缓冲、DMA 对齐、映射表、栈、堆；考虑行复用、静态缓冲和定点数值误差。</p></section>
-          <section class="method"><p class="level">横向扩展</p><h3>质量-延迟-RAM 对比</h3><p>在相同正常、急弯、缺边、阴影、反光、噪点和低分辨率输入上比较有效行、边线误差、目标板时间和峰值缓冲。</p></section>
+          <section class="method"><p class="level">基础</p><h3>看一个灰度数组</h3><p>先读 01_gray.pgm，人工对照印出的 12×8 数字块，自己判定路面边界在哪几列。</p></section>
+          <section class="method"><p class="level">进阶</p><h3>比较完整掩码与边界</h3><p>打开 fixed/Otsu/per-row/diff-ratio/Sobel PGM；观察最长白列、扫线和 IPM 分别改变了哪些像素/坐标。</p></section>
+          <section class="method"><p class="level">横向</p><h3>移植到目标驱动</h3><p>只替换帧输入函数，保存驱动灰度快照后回放。本教材不提供与未给出的相机SDK/主控绑定的驱动源码。</p></section>
         </div>
-        <details class="limits"><summary>不能冒充的测量</summary><p>这份材料不写虚构的 MCU 帧率、正确率或可用 RAM。每次板上报告都应附芯片、时钟、编译器、分辨率、代码版本、计时边界和样本数。</p></details>
-        <p class="refs">资料：<a href="https://github.com/BiliLBD/USTB_Swan/blob/main/README.md">USTB_Swan 离线调试工具</a> · <a href="https://github.com/SJTU-AuTop/RT1064-Code/blob/master/README.md">SJTU AuTop RT1064-Code</a> · <a href="https://github.com/SJTU-AuTop/LiveViewer/blob/main/README.md">LiveViewer 上位机</a></p>
+        <details class="limits" open><summary>GCC 编译命令</summary><pre><code>cd examples/c
+gcc -std=c99 -O2 -Wall -Wextra -Wpedantic image_lab.c -lm -o image_lab.exe
+.\image_lab.exe generated</code></pre><p>编译不调用 OpenCV。生成 PGM 和运行输出仅作为算法模拟；RAM/运算分析应按实验室目标板重新测量。</p></details>
+        <p class="download-row"><a class="button secondary" href="examples.zip" download>下载 C 示例与 19 张 PGM</a><a href="handbook.md">完整讲义 MD</a><a href="handbook.pdf">PDF</a></p>
       </article>
 
-      <section class="examples" aria-labelledby="examples-title">
-        <div class="section-kicker"><span>同一合成帧</span><span>输入 → 中间结果</span></div>
-        <h2 id="examples-title">看每个处理步骤分别做了什么</h2>
-        <p class="section-lead">九格图由 examples/demo.py 运行生成。合成图用于看流程，不替代实际赛道数据。</p>
-        <figure class="wide-figure"><img src="assets/normal_pipeline.png" alt="同一帧的九个处理步骤：灰度、固定阈值、Otsu、自适应阈值、高斯加Otsu、中值、形态学、Canny、逐行扫描中点"><figcaption>正常直道合成帧的 3×3 中间步骤。像素尺寸 160×120。</figcaption></figure>
-        <p class="download-row"><a class="button secondary" href="examples.zip" download>下载示例代码与输出</a><a href="qa-report.md">查看验收记录</a><span>Python 3.10–3.12 · OpenCV 4.12 · NumPy</span></p>
+      <section class="examples" aria-labelledby="c-source-title">
+        <div class="section-kicker"><span>原图与自绘图</span><span>每张有出处</span></div>
+        <h2 id="c-source-title">博客示例图和本培训仿真图</h2>
+        <p class="section-lead">下面两张是 Joshua.Xu CC BY-SA 4.0 博文里的历史图片，未改动并保留水印；其余算法过程图由本培训自绘或由 C 仿真生成。</p>
+        <div class="reference-pair">
+          <figure class="wide-figure"><img src="assets/references/source-gray-levels.jpeg" alt="Joshua.Xu原始灰度阶梯示意图，图上标注0到255并保留水印"><figcaption>原图未修改。Joshua.Xu《图像》，CC BY-SA 4.0。<a href="https://blog.csdn.net/qq_58114029/article/details/132050763">打开原文</a>。</figcaption></figure>
+          <figure class="wide-figure"><img src="assets/references/source-longest-white-column.png" alt="Joshua.Xu的最长白列扫线示意图，白色道路背景上有向上扫描的红箭头"><figcaption>原图未修改。Joshua.Xu《边线提取》，CC BY-SA 4.0。<a href="https://blog.csdn.net/qq_58114029/article/details/132132607">打开原文</a>。</figcaption></figure>
+        </div>
+        <p class="refs">全部素材授权和原图链接见 <a href="figures/references/ATTRIBUTIONS.md">图像署名表</a>。许可范围和其它开源代码链接见 <a href="sources.csv">sources.csv</a>；文本/代码许可见 <a href="CONTENT-LICENSE.md">CONTENT-LICENSE.md</a>。</p>
       </section>
 
       <section class="sources" id="sources" aria-labelledby="sources-title">
-        <div class="section-kicker"><span>来源与边界</span><span>资料已分层</span></div>
-        <h2 id="sources-title">每条线索都能回到原页面</h2>
-        <p class="section-lead">规则看目标届次和组别的最终文件；算法定义优先看 OpenCV 官方文档；队伍项目与个人文章只用于理解某次实践的取舍。</p>
+        <div class="section-kicker"><span>资料与许可</span><span>规则 / 原作者 / 官方算法文档</span></div>
+        <h2 id="sources-title">从原文进入，不照搬旧参数</h2>
         <div class="source-groups">
-          <section><h3>赛事与组别</h3><ul>
-            <li><a href="https://www.caa.org.cn/Content/260.html">中国自动化学会：竞赛介绍</a></li>
-            <li><a href="https://www.smartcar.zone/contents/1151/1171.html">智能车官网：第 21 届室外赛规则页</a> <span>访问页标注初稿，不能当最终规则。</span></li>
-            <li><a href="https://aiot.csdn.net/6a82ced410ee7a33f29c1841.html">第 21 届规则页面（CSDN）</a> <span>作为组别线索，开课前对照最终原件。</span></li>
+          <section><h3>Joshua.Xu 第18届总钻风/灰度图像系列</h3><ul>
+            <li><a href="https://blog.csdn.net/qq_58114029/article/details/131879413">Joshua.Xu 开源系列总目录（用户指定）</a></li>
+            <li><a href="https://blog.csdn.net/qq_58114029/article/details/132006971">〖1〗摄像头：曝光、焦点、视野</a></li>
+            <li><a href="https://blog.csdn.net/qq_58114029/article/details/132050763">〖2〗图像：GRAY8、Otsu、Sobel、灰度扫线、压缩</a></li>
+            <li><a href="https://blog.csdn.net/qq_58114029/article/details/132132607">〖3〗边线：最长白列、中线继承、八邻域、IPM</a></li>
+          </ul><p>三篇原文均声明 CC BY-SA 4.0；用到的 3 张原图原样保留水印并署名。其分辨率、阈值、摄像头参数是第18届旧设备经验，不作为当前组别推荐值。</p></section>
+          <section><h3>官方算法文档与补充线索</h3><ul>
+            <li><a href="https://docs.opencv.org/4.12.0/d7/d4d/tutorial_py_thresholding.html">OpenCV：固定 / Otsu / 局部阈值</a></li>
+            <li><a href="https://docs.opencv.org/4.12.0/d2/d2c/tutorial_sobel_derivatives.html">OpenCV：Sobel 公式与深度</a></li>
+            <li><a href="https://docs.opencv.org/4.12.0/da/d5c/tutorial_canny_detector.html">OpenCV：Canny 阶段</a></li>
+            <li><a href="https://docs.opencv.org/4.12.0/da/d6e/tutorial_py_geometric_transformations.html">OpenCV：resize 与 perspective transform</a></li>
+            <li><a href="https://avoid.overfit.cn/post/00bee2fcb54047edb58a4ea56ee1314a">差比和补充经验</a> <span>授权未核验，只链接/自行推导。</span></li>
           </ul></section>
-          <section><h3>队伍开源（只链接与概述）</h3><ul>
-            <li><a href="https://github.com/BiliLBD/USTB_Swan/blob/main/README.md">USTB_Swan / README</a></li>
-            <li><a href="https://github.com/SJTU-AuTop/RT1064-Code/blob/master/README.md">SJTU AuTop / RT1064-Code</a></li>
-            <li><a href="https://github.com/SJTU-AuTop/Openart-Code/blob/main/README.md">SJTU AuTop / Openart-Code</a></li>
-            <li><a href="https://github.com/SJTU-AuTop/LiveViewer/blob/main/README.md">SJTU AuTop / LiveViewer</a></li>
-            <li><a href="https://github.com/HaliFax-Desk/SmartCar21-Loongson">SmartCar21-Loongson</a></li>
-          </ul><p class="source-caveat">访问时仓库根目录未见明确许可证；没有复制源码、图片或界面。历史年份与硬件不同，不能直接外推。</p></section>
-          <section><h3>算法文档与实践案例</h3><ul>
-            <li><a href="https://docs.opencv.org/4.12.0/d7/d4d/tutorial_py_thresholding.html">OpenCV：阈值化</a></li>
-            <li><a href="https://docs.opencv.org/4.12.0/d5/d98/tutorial_mat_operations.html">OpenCV：图像数组、ROI、灰度</a></li>
-            <li><a href="https://docs.opencv.org/4.13.0/dc/dd3/tutorial_gausian_median_blur_bilateral_filter.html">OpenCV：平滑滤波</a></li>
-            <li><a href="https://docs.opencv.org/4.12.0/da/d6e/tutorial_py_geometric_transformations.html">OpenCV：缩放与透视变换</a></li>
-            <li><a href="https://docs.opencv.org/4.12.0/d4/d73/tutorial_py_contours_begin.html">OpenCV：轮廓</a></li>
-            <li><a href="https://modelers.csdn.net/69a7a1ea7bbde9200b9d5b64.html">CSDN：历史镜头经验</a></li>
-            <li><a href="https://damodev.csdn.net/6880a5f0bb9d8e0ecec2b1f8.html">CSDN：八邻域/迷宫法个案</a></li>
-            <li><a href="https://www.bilibili.com/video/BV1VN411N79B/">B 站：八邻域巡线视频</a> · <a href="https://www.bilibili.com/video/BV1jr421V7t1/">环岛状态机视频</a></li>
-          </ul></section>
+          <section><h3>GitHub 开源横向阅读</h3><ul>
+            <li><a href="https://github.com/BiliLBD/USTB_Swan">USTB_Swan：图像回放、扫线与逆透视工具线索</a></li>
+            <li><a href="https://github.com/SJTU-AuTop/RT1064-Code">SJTU-AuTop RT1064-Code：第16届主控案例</a></li>
+            <li><a href="https://github.com/SJTU-AuTop/Openart-Code">SJTU-AuTop Openart-Code：视觉识别仓库</a></li>
+            <li><a href="https://github.com/SJTU-AuTop/LiveViewer">SJTU-AuTop LiveViewer：图像显示工具</a></li>
+            <li><a href="https://github.com/HaliFax-Desk/SmartCar21-Loongson">SmartCar21-Loongson：另一届次/硬件的图像实现</a></li>
+          </ul><p>这些仓库只供按组别和许可证自行对照。本课程不复制未核实授权的代码、图片、模型或界面。</p></section>
         </div>
-        <div class="reference-status"><strong>KDocs 样例访问失败</strong><span>依流程使用备用结构设计，没有推测原页面版式。逐条来源、证据位置、日期与限制见来源表。</span><a href="sources.csv">打开 sources.csv</a></div>
+        <div class="reference-status"><strong>组别/硬件边界</strong><span>本次未收到目标届次和主控信息；博客是历史案例。开课前对照组委会当年最终组别规则和实验室真实总钻风帧复核。</span><a href="scope.md">范围记录</a></div>
       </section>
 
       <section class="glossary" aria-labelledby="glossary-title">
-        <div class="section-kicker"><span>随身词表</span><span>9 个概念</span></div>
-        <h2 id="glossary-title">术语简表</h2>
+        <div class="section-kicker"><span>随身词表</span><span>灰度图像术语</span></div>
+        <h2 id="glossary-title">快速查词</h2>
         <dl class="glossary-grid">
-          <div><dt>灰度图</dt><dd>每像素一个亮度值。</dd></div>
-          <div><dt>二值图</dt><dd>每像素只标记两类中的一类。</dd></div>
-          <div><dt>阈值极性</dt><dd>规定哪一类成为前景。</dd></div>
-          <div><dt>ROI</dt><dd>任务真正需要的图像区域。</dd></div>
-          <div><dt>八邻域</dt><dd>上下左右与四个斜角邻点。</dd></div>
-          <div><dt>单应变换</dt><dd>平面到平面的 3×3 投影近似。</dd></div>
-          <div><dt>连通域</dt><dd>按邻接关系分出的前景像素组。</dd></div>
-          <div><dt>位打包</dt><dd>多个 1-bit 像素放入同一 byte。</dd></div>
-          <div><dt>帧回放</dt><dd>用同一已保存输入重复运行算法。</dd></div>
+          <div><dt>GRAY8</dt><dd>每像素一个 8-bit 灰度采样，通常 0..255。</dd></div>
+          <div><dt>二值掩码</dt><dd>每个点按前景/背景分组；显示为0/255。</dd></div>
+          <div><dt>直方图</dt><dd>统计0..255每种灰度值出现次数。</dd></div>
+          <div><dt>差比和</dt><dd>将两点绝对灰度差按灰度和值归一化。</dd></div>
+          <div><dt>Sobel</dt><dd>用小卷积核近似横/纵灰度导数。</dd></div>
+          <div><dt>最长白列</dt><dd>逐列从图像近端向远端数连续白前景。</dd></div>
+          <div><dt>中线继承</dt><dd>上一行中点作为下一行的扫线起点。</dd></div>
+          <div><dt>八邻域</dt><dd>检查当前像素周围八个方向的邻点。</dd></div>
+          <div><dt>单应矩阵</dt><dd>两个平面之间的 3×3 透视投影关系。</dd></div>
         </dl>
       </section>
 
       <footer class="footer">
-        <p>镜头车图像处理新生培训 · 讲义、图与代码均保存在下载区。</p>
-        <div><a href="syllabus.md">课程大纲</a><a href="handbook.md">Markdown</a><a href="handbook.pdf">PDF</a><a href="sources.csv">来源清单</a><a href="qa-report.md">验收记录</a></div>
-        <small>合成帧不是比赛采集数据；组别限制应查当届最终规则。</small>
+        <p>图像处理 · C99 灰度实验</p>
+        <div><a href="course-package.zip">完整资料 ZIP</a><a href="syllabus.md">课表</a><a href="handbook.md">Markdown</a><a href="handbook.pdf">PDF</a><a href="sources.csv">来源清单</a><a href="qa-report.md">验收记录</a><a href="CONTENT-LICENSE.md">内容许可</a></div>
+        <small>博客图与自绘图在正文单独署名；不含彩色图像处理内容。</small>
       </footer>
     </main>
   </div>
-  <noscript><p class="noscript">交互滑杆需要启用 JavaScript；课程文字、图示和下载仍可使用。</p></noscript>
+  <noscript><p class="noscript">互动演示需要 JavaScript；文字、静态图和下载仍可查看。</p></noscript>
 </body>
 </html>

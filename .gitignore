@@ -1,0 +1,5 @@
+# Local C build outputs
+examples/c/image_lab.exe
+
+# Legacy/generated scratch output; canonical outputs live in examples/c/generated/
+examples/generated_c/

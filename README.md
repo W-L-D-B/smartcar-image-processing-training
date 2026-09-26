@@ -1,44 +1,42 @@
-# 镜头车图像处理新生培训
+# 图像处理
 
-中文教学资料与可公开浏览的静态课程站。全部示意图为原创 SVG，示例帧由 `examples/demo.py` 生成；引用的队伍仓库和个人资料只作出处链接/摘要，未复制其代码、截图、视频或界面。
+这是面向智能车实验室新生的镜头车图像处理课程。教材从总钻风摄像头输出的单通道 GRAY8 数组开始，用 C99 讲像素、灰度差/差比和、二值阈值、降采样、滤波、Sobel、扫线、八邻域和 IPM。课程不包含颜色处理或车辆控制算法。
 
-## 本地预览网站
+## 文件
 
-从本目录运行：
+- site/：可直接部署的静态交互网页；章节有基础/进阶/横向扩展切换。
+- handbook.md、handbook.pdf：完整中文讲义与同内容 PDF。
+- course-package.zip：可直接转发的课程资料包，保留 Markdown 所需图片路径并附 PDF、C 代码、课表、来源表和许可说明。
+- syllabus.md：六次课教案，共 330 分钟。
+- examples/c/image_lab.c：纯 C99 灰度仿真程序，不依赖私有摄像头 SDK。
+- examples/c/generated/：编译运行后生成的 19 张单通道 PGM 和总览图。
+- figures/：自绘教学 SVG；figures/references/ 有三张按 CC BY-SA 4.0 署名的原文图。
+- sources.csv、scope.md、CONTENT-LICENSE.md、qa-report.md：来源证据、课程边界、许可和验收。
+
+## 编译并运行 C 实验
+
+在 examples/c 目录执行：
+
+~~~powershell
+gcc -std=c99 -O2 -Wall -Wextra -Wpedantic image_lab.c -lm -o image_lab.exe
+.\image_lab.exe generated
+~~~
+
+默认生成确定性合成的 80×48 GRAY8 灰度帧，包括亮度渐变、阴影、局部反光和可复现噪点。程序生成 Otsu/固定/逐行/局部阈值、差比和、中值与形态学、Sobel/Canny、逐行扫线、最长白列、八邻域及 IPM 中间结果。合成结果可以复现，但不能代表实验室实拍画面、目标 MCU 速度或车辆成绩。
+
+接入实验室相机时，仅将读取帧缓冲的适配层替换为本实验室实际 SDK；先检查灰度格式、宽高、行跨度和采集缓冲所有权。不要直接复制历史博客中的相机宏、阈值或运行参数。
+
+## 本地查看网站
 
 ~~~powershell
 python -m http.server 8000 --directory site
 ~~~
 
-浏览器打开 `http://127.0.0.1:8000/`。网站不依赖第三方 CDN 或登录。
+打开 http://127.0.0.1:8000/ 。公网网页：[图像处理](https://w-l-d-b.github.io/smartcar-image-processing-training/)。
 
-## 培训讲义与示例
+## 来源与许可
 
-- `handbook.md`：可直接转发的完整讲义。
-- `handbook.pdf`：同内容 PDF，A4 14 页，已逐页渲染检查。
-- `syllabus.md`：6 次课、320 分钟的安排。
-- `sources.csv`：来源、证据位置、访问日期和使用限制。
-- `scope.md`：赛规范围、资料层级与未核验项。
-- qa-report.md：代码、PDF、网站和公开访问验收证据。
-- `figures/`：9 张可编辑原创 SVG。
-- `examples/`：Python/OpenCV 代码和可复现合成帧。
+三篇 Joshua.Xu 第18届四轮车图像系列文章声明 CC BY-SA 4.0。本培训只将三张原作者示意图按原样保留水印并署名；正文/公式说明、自绘图和 C 仿真另行编写。差比和补充页未核实授权，因此只链接并独立推导。原创 C 代码按 MIT 许可。仓库清单和证据边界见 sources.csv、figures/references/ATTRIBUTIONS.md 与 CONTENT-LICENSE.md。
 
-示例代码：
+本课程按实验室提供的“总钻风灰度帧”背景讲解，不推断具体型号、分辨率、主控、目标组别或最新赛规。开课前由负责人核对实际设备和当年正式规则。
 
-~~~powershell
-cd examples
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-python demo.py --out generated
-~~~
-
-程序生成的 `metrics.csv` 只记录运行机器的本机测量，不是 MCU 性能报告。
-
-## 公开网页发布
-
-`site/` 是完整静态页面，也包括讲义、来源表和示例压缩包。仓库的 GitHub Actions 工作流会把 `site/` 发布到 GitHub Pages。首次创建站点时若 GitHub 要求选择发布源，在仓库 Settings → Pages 选择 GitHub Actions。公开访问 URL 只有在推送后通过未登录会话检查，才会在 QA 报告和交付说明中写为“已公开”。
-
-## 课程适用边界
-
-课程按通用单目摄像头循迹设计。实验室目标届次、组别、相机与主控未提供；开课前要按组委会最终规则核对传感器、限高、任务元素和硬件。KDocs 版式参考本次访问失败，网页按执行流程给出的备用结构制作。
