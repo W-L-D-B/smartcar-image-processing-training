@@ -62,7 +62,13 @@ gcc -std=c99 -O2 -Wall -Wextra -Wpedantic image_lab.c -lm -o image_lab.exe
 
 ## 公网发布状态
 
-当前静态文件已在本地通过验收；本候选版本的 GitHub Pages 推送与匿名访问复核仍待执行。完成后必须在本节记录实际部署 commit / Action run、无登录 HTTP 状态、随机章节和所有下载响应，再标记已公开。
+课程内容版本已发布到 [GitHub Pages](https://w-l-d-b.github.io/smartcar-image-processing-training/)：
+
+- 内容提交：42ae3e3fb9b1c125ee831aea4ce5c0d6ad36182b。
+- GitHub Pages 工作流运行 [36282056210](https://github.com/W-L-D-B/smartcar-image-processing-training/actions/runs/36282056210) 已完成，结论为 success。
+- 2026-09-27 使用无 Cookie 的全新 Chromium 上下文访问：主页 HTTP 200、无登录跳转，最终 URL 未改变，标题为“图像处理”。
+- 公网版本重新运行全部 7 项互动、9 个章节切换、1440/768/375px 布局与键盘首焦点检查，结果与本地验收一致。
+- Markdown、PDF、课表、来源 CSV、示例 ZIP、资料 ZIP、验收报告、许可和署名表共 9 个资源均从公网返回 HTTP 200 且非空；未发现坏图、脚本异常、控制台错误或外部资源请求。
 
 ## 仍然未知
 
