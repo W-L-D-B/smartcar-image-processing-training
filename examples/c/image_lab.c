@@ -123,7 +123,7 @@ static uint8_t otsu_threshold(Gray image)
     uint32_t count_background = 0;
     uint64_t sum_background = 0;
     double best_variance = -1.0;
-    int best_threshold = 0;
+    int best_threshold = 1;
     int i, y, x;
 
     for (y = 0; y < IMG_H; ++y) {
@@ -148,7 +148,7 @@ static uint8_t otsu_threshold(Gray image)
                   (mean_background - mean_foreground);
         if (between > best_variance) {
             best_variance = between;
-            best_threshold = i;
+            best_threshold = i + 1; /* bright class begins at T */
         }
     }
     return (uint8_t)best_threshold;
@@ -238,31 +238,6 @@ static void threshold_local_mean(Gray image, Mask mask, int radius, int offset)
             /* Bright road is the foreground; local threshold is mean + offset. */
             mask[y][x] = ((uint32_t)image[y][x] * count >= sum + (uint32_t)offset * count)
                          ? WHITE : BLACK;
-        }
-    }
-}
-
-static uint8_t difference_ratio_q7(uint8_t a, uint8_t b)
-{
-    const int32_t difference = (int32_t)a - (int32_t)b;
-    const int32_t magnitude = (difference < 0) ? -difference : difference;
-    const int32_t denominator = (int32_t)a + (int32_t)b + 1;
-    return (uint8_t)((magnitude * 128) / denominator);
-}
-
-static void difference_ratio_mask(Gray image, Mask mask,
-                                 int horizontal_gap, uint8_t threshold)
-{
-    int x, y;
-    for (y = 0; y < IMG_H; ++y) {
-        for (x = 0; x < IMG_W; ++x) {
-            const int next_x = x + horizontal_gap;
-            if (next_x >= IMG_W) {
-                mask[y][x] = BLACK;
-            } else {
-                mask[y][x] = (difference_ratio_q7(image[y][x], image[y][next_x]) >= threshold)
-                             ? WHITE : BLACK;
-            }
         }
     }
 }
@@ -359,11 +334,9 @@ static void morphology_close(Mask input, Mask output)
     erode_3x3(temporary, output);
 }
 
-static void sobel(Gray image, Gray gx_image, Gray gy_image, Gray magnitude)
+static void sobel(Gray image, Gray magnitude)
 {
     int x, y;
-    memset(gx_image, 0, sizeof(Gray));
-    memset(gy_image, 0, sizeof(Gray));
     memset(magnitude, 0, sizeof(Gray));
     for (y = 1; y < IMG_H - 1; ++y) {
         for (x = 1; x < IMG_W - 1; ++x) {
@@ -376,8 +349,6 @@ static void sobel(Gray image, Gray gx_image, Gray gy_image, Gray magnitude)
                 + (int)image[y + 1][x - 1] + 2 * (int)image[y + 1][x] + (int)image[y + 1][x + 1];
             const int abs_gx = (gx < 0) ? -gx : gx;
             const int abs_gy = (gy < 0) ? -gy : gy;
-            gx_image[y][x] = clamp_u8(128 + gx / 4);
-            gy_image[y][x] = clamp_u8(128 + gy / 4);
             magnitude[y][x] = clamp_u8((abs_gx + abs_gy) / 8);
         }
     }
@@ -743,7 +714,7 @@ int main(int argc, char **argv)
 {
     const char *output_dir = (argc > 1) ? argv[1] : "generated";
     Gray input, intermeans_mask, fixed_mask, row_mask, local_mask;
-    Gray ratio_mask, median, gx, gy, magnitude, sobel_mask, trace, ipm;
+    Gray median, magnitude, sobel_mask, trace, ipm;
     Mask otsu_mask, scan_mask, morph_open, morph_close, canny_edges;
     SmallGray reduced;
     uint8_t packed[(PIXELS + 7u) / 8u];
@@ -769,11 +740,10 @@ int main(int argc, char **argv)
     threshold_intermeans(input, intermeans_mask);
     threshold_per_row(input, row_mask);
     threshold_local_mean(input, local_mask, 4, 4);
-    difference_ratio_mask(input, ratio_mask, 3, 24u);
     median_3x3(input, median);
     morphology_open(fixed_mask, morph_open);
     morphology_close(fixed_mask, morph_close);
-    sobel(input, gx, gy, magnitude);
+    sobel(input, magnitude);
     sobel_threshold(magnitude, sobel_mask, 26u);
     {
         const int count = canny_simple(input, canny_edges, 80u, 170u);
@@ -801,8 +771,6 @@ int main(int argc, char **argv)
     printf("BINARY PACKED: %lu B (uint8 mask would be %lu B)\n",
            (unsigned long)((PIXELS + 7u) / 8u), (unsigned long)PIXELS);
     printf("fixed T=128, intermeans T=%u, Otsu T=%u\n", intermeans, otsu);
-    printf("difference-ratio Q7 samples: (200,40)=%u, (62,60)=%u\n",
-           difference_ratio_q7(200u, 40u), difference_ratio_q7(62u, 60u));
     for (y = 0; y < IMG_H; ++y)
         for (x = 0; x < IMG_W; ++x)
             if (sobel_mask[y][x] != 0u) edge_count++;
@@ -839,19 +807,15 @@ int main(int argc, char **argv)
         !save_stage(output_dir, "04_intermeans.pgm", &intermeans_mask[0][0], IMG_W, IMG_H) ||
         !save_stage(output_dir, "05_per_row.pgm", &row_mask[0][0], IMG_W, IMG_H) ||
         !save_stage(output_dir, "06_local_mean.pgm", &local_mask[0][0], IMG_W, IMG_H) ||
-        !save_stage(output_dir, "07_diff_ratio.pgm", &ratio_mask[0][0], IMG_W, IMG_H) ||
-        !save_stage(output_dir, "08_median.pgm", &median[0][0], IMG_W, IMG_H) ||
-        !save_stage(output_dir, "09_morph_open.pgm", &morph_open[0][0], IMG_W, IMG_H) ||
-        !save_stage(output_dir, "10_morph_close.pgm", &morph_close[0][0], IMG_W, IMG_H) ||
-        !save_stage(output_dir, "11_sobel_gx.pgm", &gx[0][0], IMG_W, IMG_H) ||
-        !save_stage(output_dir, "12_sobel_gy.pgm", &gy[0][0], IMG_W, IMG_H) ||
-        !save_stage(output_dir, "13_sobel_magnitude.pgm", &magnitude[0][0], IMG_W, IMG_H) ||
-        !save_stage(output_dir, "14_sobel_edges.pgm", &sobel_mask[0][0], IMG_W, IMG_H) ||
-        !save_stage(output_dir, "15_canny_edges.pgm", &canny_edges[0][0], IMG_W, IMG_H) ||
-        !save_stage(output_dir, "16_scan.pgm", &scan_mask[0][0], IMG_W, IMG_H) ||
-        !save_stage(output_dir, "17_trace8.pgm", &trace[0][0], IMG_W, IMG_H) ||
-        !save_stage(output_dir, "18_ipm.pgm", &ipm[0][0], IMG_W, IMG_H) ||
-        !save_stage(output_dir, "19_downsample.pgm", &reduced[0][0], OUT_W, OUT_H)) {
+        !save_stage(output_dir, "07_median.pgm", &median[0][0], IMG_W, IMG_H) ||
+        !save_stage(output_dir, "08_morph_open.pgm", &morph_open[0][0], IMG_W, IMG_H) ||
+        !save_stage(output_dir, "09_morph_close.pgm", &morph_close[0][0], IMG_W, IMG_H) ||
+        !save_stage(output_dir, "10_sobel_edges.pgm", &sobel_mask[0][0], IMG_W, IMG_H) ||
+        !save_stage(output_dir, "11_canny_edges.pgm", &canny_edges[0][0], IMG_W, IMG_H) ||
+        !save_stage(output_dir, "12_scan.pgm", &scan_mask[0][0], IMG_W, IMG_H) ||
+        !save_stage(output_dir, "13_trace8.pgm", &trace[0][0], IMG_W, IMG_H) ||
+        !save_stage(output_dir, "14_ipm.pgm", &ipm[0][0], IMG_W, IMG_H) ||
+        !save_stage(output_dir, "15_downsample.pgm", &reduced[0][0], OUT_W, OUT_H)) {
         return EXIT_FAILURE;
     }
     print_patch("input", input);

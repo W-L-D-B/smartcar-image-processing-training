@@ -87,7 +87,7 @@
       if(!w0||!w1)continue;
       var m0=sum0/w0, m1=(sumAll-sum0)/w1, d=m0-m1;
       var score=w0*w1*d*d;
-      if(score>best){best=score;bestT=t;}
+      if(score>best){best=score;bestT=t+1;}
     }
     return bestT;
   }
@@ -172,67 +172,40 @@
       (mode==="fixed"||mode==="otsu")?result.threshold:-1);
     document.getElementById("threshold-value").value=String(mode==="fixed"||mode==="otsu"?result.threshold:param);
     document.getElementById("threshold-label").value=mode==="fixed"?"T":mode==="otsu"?"Otsu T":mode==="row"?"行阈值起点":"局部 C";
+    thresholdSlider.disabled = mode==="otsu";
     var white=0;for(var i=0;i<currentMask.length;i++)if(currentMask[i])white++;
     document.getElementById("threshold-status").textContent=
       "模式："+thresholdMode.options[thresholdMode.selectedIndex].text+
       "；全局阈值="+(mode==="fixed"||mode==="otsu"?result.threshold:"逐行/逐点")+
       "；白前景 "+white+" / "+(W*H)+" ("+(100*white/(W*H)).toFixed(1)+"%)";
-    updateRatio();updateScanning();
+    updateScanning();
   }
   sceneSelect.addEventListener("change",function(){updateThreshold();updateSobel();});
   thresholdMode.addEventListener("change",updateThreshold);
   thresholdSlider.addEventListener("input",updateThreshold);
 
-  function ratioQ7(a,b){return Math.floor(Math.abs(a-b)*128/(a+b+1));}
-  function updateRatio() {
-    if(!currentScene)return;
-    var gap=Number(document.getElementById("ratio-gap").value);
-    var th=Number(document.getElementById("ratio-threshold").value);
-    var output=new Uint8ClampedArray(W*H),count=0;
-    for(var y=0;y<H;y++)for(var x=0;x<W;x++){
-      var nx=Math.min(W-1,x+gap),q=ratioQ7(currentScene[y*W+x],currentScene[y*W+nx]);
-      output[y*W+x]=clamp(q*2);
-      if(q>=th)count++;
-    }
-    paint(document.getElementById("ratio-input"),currentScene,W,H);
-    paint(document.getElementById("ratio-output"),output,W,H);
-    document.getElementById("ratio-gap-value").value=String(gap);
-    document.getElementById("ratio-threshold-value").value=String(th);
-    document.getElementById("ratio-status").textContent="候选跳变："+count+" 点；显示图以灰度表示Q7响应强度。";
-  }
-  document.getElementById("ratio-gap").addEventListener("input",updateRatio);
-  document.getElementById("ratio-threshold").addEventListener("input",updateRatio);
-
-  function sobelMaps(pixels,width,height) {
-    var gxmap=new Uint8ClampedArray(width*height),gymap=new Uint8ClampedArray(width*height),mag=new Uint8ClampedArray(width*height);
+  function sobelMagnitude(pixels,width,height) {
+    var mag=new Uint8ClampedArray(width*height);
     for(var y=1;y<height-1;y++)for(var x=1;x<width-1;x++){
       var p00=pixels[(y-1)*width+x-1],p01=pixels[(y-1)*width+x],p02=pixels[(y-1)*width+x+1];
       var p10=pixels[y*width+x-1],p12=pixels[y*width+x+1];
       var p20=pixels[(y+1)*width+x-1],p21=pixels[(y+1)*width+x],p22=pixels[(y+1)*width+x+1];
       var gx=-p00+p02-2*p10+2*p12-p20+p22;
       var gy=-p00-2*p01-p02+p20+2*p21+p22,i=y*width+x;
-      gxmap[i]=clamp(128+gx/8);gymap[i]=clamp(128+gy/8);
       mag[i]=clamp((Math.abs(gx)+Math.abs(gy))/8);
     }
-    return {gx:gxmap,gy:gymap,mag:mag};
+    return mag;
   }
   function updateSobel() {
-    var src=makeFrame(sceneSelect.value,W,H),maps=sobelMaps(src,W,H);
-    var mode=document.getElementById("sobel-channel").value;
-    var th=Number(document.getElementById("sobel-threshold").value),out=maps.mag,count=0;
-    if(mode==="gx")out=maps.gx;
-    if(mode==="gy")out=maps.gy;
-    if(mode==="edges"){
-      out=new Uint8ClampedArray(W*H);
-      for(var i=0;i<out.length;i++){out[i]=maps.mag[i]>=th?255:0;if(out[i])count++;}
-    }
+    var src=makeFrame(sceneSelect.value,W,H),magnitude=sobelMagnitude(src,W,H);
+    var th=Number(document.getElementById("sobel-threshold").value);
+    var out=new Uint8ClampedArray(W*H),count=0;
+    for(var i=0;i<out.length;i++){out[i]=magnitude[i]>=th?255:0;if(out[i])count++;}
     paint(document.getElementById("sobel-input"),src,W,H);
     paint(document.getElementById("sobel-output"),out,W,H);
     document.getElementById("sobel-value").value=String(th);
-    document.getElementById("sobel-status").textContent=mode==="edges"
-      ?"超过梯度阈值的候选："+count+" 点":"当前通道："+document.getElementById("sobel-channel").selectedOptions[0].text;
+    document.getElementById("sobel-status").textContent="阈值 T="+th+"；二值边缘像素："+count+" / "+(W*H);
   }
-  document.getElementById("sobel-channel").addEventListener("change",updateSobel);
   document.getElementById("sobel-threshold").addEventListener("input",updateSobel);
 
   function edgePair(mask,y,start) {
@@ -280,25 +253,63 @@
     var mask=currentMask||thresholdFrame(currentScene,"fixed",128,W,H).mask;
     var mode=document.getElementById("scan-mode").value,y=Number(document.getElementById("scan-row").value);
     var result=mode==="longest"?scanLongest(mask):mode==="inherit"?scanInherit(mask):scanRows(mask);
-    var overlay=new Uint8ClampedArray(currentScene.length);overlay.set(currentScene);
     var e=result.rows[y];
-    if(e&&e.valid)for(var x=e.left;x<=e.right;x++)overlay[y*W+x]=x===e.left?82:x===e.right?168:236;
-    if(mode==="longest"&&result.seedL>=0){
-      for(var yy=H-1;yy>=Math.max(0,H-result.stop);yy--){overlay[yy*W+result.seedL]=90;overlay[yy*W+result.seedR]=180;}
-    }
     paint(document.getElementById("scan-mask"),mask,W,H);
-    paint(document.getElementById("scan-result"),overlay,W,H);
+    var maskCanvas=document.getElementById("scan-mask");
+    var maskCtx=maskCanvas.getContext("2d");
+    maskCtx.save();maskCtx.scale(maskCanvas.width/W,maskCanvas.height/H);
+    maskCtx.strokeStyle="#E0A51C";maskCtx.lineWidth=1.5;maskCtx.setLineDash([3,2]);
+    maskCtx.beginPath();maskCtx.moveTo(0,y+0.5);maskCtx.lineTo(W,y+0.5);maskCtx.stroke();
+    maskCtx.restore();
+
+    var canvas=document.getElementById("scan-result");
+    paint(canvas,currentScene,W,H);
+    var ctx=canvas.getContext("2d");
+    ctx.save();ctx.scale(canvas.width/W,canvas.height/H);ctx.lineWidth=1.8;
+    function traceRows(valueAt,color,dash){
+      ctx.strokeStyle=color;ctx.setLineDash(dash);ctx.beginPath();
+      var open=false;
+      for(var yy=H-1;yy>=0;yy--){
+        var row=result.rows[yy];
+        if(row&&row.valid){
+          var xx=valueAt(row);
+          if(!open){ctx.moveTo(xx+0.5,yy+0.5);open=true;}
+          else ctx.lineTo(xx+0.5,yy+0.5);
+        }else open=false;
+      }
+      ctx.stroke();
+    }
+    traceRows(function(row){return row.left;},"#D64A3B",[]);
+    traceRows(function(row){return row.right;},"#2678C8",[]);
+    traceRows(function(row){return (row.left+row.right)/2;},"#168A58",[5,3]);
+    if(mode==="longest"&&result.seedL>=0){
+      ctx.strokeStyle="#7652A5";ctx.lineWidth=1.2;ctx.setLineDash([3,3]);ctx.beginPath();
+      ctx.moveTo(result.seedL+0.5,H-1);ctx.lineTo(result.seedL+0.5,Math.max(0,H-result.stop));
+      ctx.moveTo(result.seedR+0.5,H-1);ctx.lineTo(result.seedR+0.5,Math.max(0,H-result.stop));
+      ctx.stroke();
+    }
+    ctx.strokeStyle="#E0A51C";ctx.lineWidth=1.5;ctx.setLineDash([3,2]);ctx.beginPath();
+    ctx.moveTo(0,y+0.5);ctx.lineTo(W,y+0.5);ctx.stroke();
+    if(e&&e.valid){
+      var mid=(e.left+e.right)/2;
+      ctx.setLineDash([]);
+      ctx.fillStyle="#D64A3B";ctx.beginPath();ctx.arc(e.left+0.5,y+0.5,2.2,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#2678C8";ctx.beginPath();ctx.arc(e.right+0.5,y+0.5,2.2,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#7652A5";ctx.beginPath();ctx.arc(mid+0.5,y+0.5,2.6,0,Math.PI*2);ctx.fill();
+    }
+    ctx.restore();
     document.getElementById("scan-row-value").value=String(y);
     document.getElementById("scan-status").textContent=e&&e.valid
-      ?"y="+y+"；L="+e.left+"；R="+e.right+"；中点="+Math.floor((e.left+e.right)/2)
+      ?"y="+y+"；L="+e.left+"；R="+e.right+"；中点="+Math.floor((e.left+e.right)/2)+"；各行中线与边界已用不同颜色连线"
        +(mode==="longest"?"；种子="+result.seedL+"/"+result.seedR+"，搜索截止 "+result.stop+" 行":"")
       :"y="+y+" 没有有效双边界；记 valid=0，不把画面边缘伪造为边线。";
   }
   document.getElementById("scan-mode").addEventListener("change",updateScanning);
   document.getElementById("scan-row").addEventListener("input",updateScanning);
 
-  var tracePath=[[1,6],[2,6],[3,6],[4,6],[5,6],[6,6],[6,5],[6,4],[6,3],[5,3],[4,3],[3,3],[3,2],[3,1],[4,1],[5,1],[6,1]];
-  var traceDirections=["E","E","E","E","E","N","N","N","W","W","W","N","N","E","E","E"];
+  /* A boundary of a white road region, climbed from the near end to the far end. */
+  var tracePath=[[2,7],[2,6],[3,5],[4,4],[4,3],[3,2],[2,1],[2,0]];
+  var traceDirections=["N","NE","NE","N","NW","NW","N"];
   function drawNeighborSteps() {
     var canvas=document.getElementById("neighbor-canvas"),ctx=canvas.getContext("2d");
     var step=Number(document.getElementById("neighbor-steps").value),cell=38,cols=8,rows=8;
@@ -306,16 +317,39 @@
     ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle="#f0f1ed";ctx.fillRect(0,0,canvas.width,canvas.height);
     for(var y=0;y<rows;y++)for(var x=0;x<cols;x++){
       var index=tracePath.findIndex(function(p){return p[0]===x&&p[1]===y;});
-      ctx.fillStyle=index>=0&&index<step?"#8a9691":"#fffefa";
-      if(index===step&&step<tracePath.length)ctx.fillStyle="#253735";
+      var roadLeft=[2,2,2,3,4,4,3,2][y];
+      var onRoad=x>=roadLeft&&x<=Math.min(cols-1,roadLeft+3);
+      ctx.fillStyle=onRoad?"#E7EFE9":"#303B38";
+      if(index>=0)ctx.fillStyle="#BCCBC2";
       ctx.fillRect(ox+x*cell+1,oy+y*cell+1,cell-2,cell-2);
       ctx.strokeStyle="#b8c4bd";ctx.strokeRect(ox+x*cell+1,oy+y*cell+1,cell-2,cell-2);
-      if(index>=0&&index<step){ctx.fillStyle="#fff";ctx.font="14px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(String(index),ox+x*cell+cell/2,oy+y*cell+cell/2);}
+      if(index>=0&&index<step){ctx.fillStyle="#173A32";ctx.font="14px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(String(index),ox+x*cell+cell/2,oy+y*cell+cell/2);}
     }
+    var current=tracePath[Math.min(step,tracePath.length-1)];
+    var center=function(p){return [ox+p[0]*cell+cell/2,oy+p[1]*cell+cell/2];};
+    if(step>0){
+      ctx.beginPath();
+      var start=center(tracePath[0]);ctx.moveTo(start[0],start[1]);
+      for(var i=1;i<=step;i++){var p=center(tracePath[i]);ctx.lineTo(p[0],p[1]);}
+      ctx.strokeStyle="#D43F35";ctx.lineWidth=4;ctx.lineCap="round";ctx.lineJoin="round";ctx.setLineDash([]);ctx.stroke();
+    }
+    var cur=center(current);
+    if(step<tracePath.length-1){
+      var next=center(tracePath[step+1]);
+      ctx.beginPath();ctx.moveTo(cur[0],cur[1]);ctx.lineTo(next[0],next[1]);
+      ctx.strokeStyle="#B3261E";ctx.lineWidth=2.2;ctx.setLineDash([4,2]);ctx.stroke();ctx.setLineDash([]);
+      var angle=Math.atan2(next[1]-cur[1],next[0]-cur[0]),head=8;
+      ctx.beginPath();ctx.moveTo(next[0],next[1]);
+      ctx.lineTo(next[0]-head*Math.cos(angle-.55),next[1]-head*Math.sin(angle-.55));
+      ctx.lineTo(next[0]-head*Math.cos(angle+.55),next[1]-head*Math.sin(angle+.55));ctx.closePath();
+      ctx.fillStyle="#B3261E";ctx.fill();
+    }
+    ctx.beginPath();ctx.arc(cur[0],cur[1],8,0,Math.PI*2);
+    ctx.fillStyle="#D43F35";ctx.fill();ctx.strokeStyle="#fff";ctx.lineWidth=2;ctx.stroke();
     document.getElementById("neighbor-steps-value").value=String(step);
-    var pos=tracePath[Math.min(step,tracePath.length-1)];
-    var dir=step>0?traceDirections[Math.min(step-1,traceDirections.length-1)]:"未开始";
-    document.getElementById("neighbor-status").textContent="步="+step+"；当前坐标 ("+pos[0]+","+pos[1]+")；进入方向="+dir+"；最长运行步数="+tracePath.length+"。";
+    var entry=step>0?traceDirections[Math.min(step-1,traceDirections.length-1)]:"种子";
+    var nextDir=step<tracePath.length-1?traceDirections[step]:"到达演示终点";
+    document.getElementById("neighbor-status").textContent="已爬="+step+" 步；当前位置 ("+current[0]+","+current[1]+")；进入="+entry+"；下一步="+nextDir+"。";
   }
   document.getElementById("neighbor-steps").addEventListener("input",drawNeighborSteps);
 
@@ -396,5 +430,5 @@
   }
   document.getElementById("scale-slider").addEventListener("input",updateSampling);
 
-  updateThreshold();updateRatio();updateSobel();updateScanning();drawNeighborSteps();updateIpm();updateSampling();
+  updateThreshold();updateSobel();updateScanning();drawNeighborSteps();updateIpm();updateSampling();
 }());
