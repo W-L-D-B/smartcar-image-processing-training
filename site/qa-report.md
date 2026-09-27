@@ -43,6 +43,14 @@ gcc -std=c99 -O2 -Wall -Wextra -Wpedantic examples/c/image_lab.c -lm -o image_la
 - 在 1440、768、375 px 视口均无横向溢出；键盘第一焦点为跳转链接；0 个控制台错误、脚本错误、失败请求或外部资源请求。
 - 对桌面/手机视口及互动 05/06 作了截图检查。没有已提交的视觉基线，因此自动像素回归为 INCONCLUSIVE；本次记录布局与内容人工检查结果，不宣称像素回归通过。
 
+## 无登录公网验收
+
+- 公网地址：[图像处理培训](https://w-l-d-b.github.io/smartcar-image-processing-training/)。无 Cookie 的 Chromium 会话直达主页，HTTP 200，无重定向；页面标题仍为“图像处理”。
+- GitHub Pages 部署工作流 [36320182220](https://github.com/W-L-D-B/smartcar-image-processing-training/actions/runs/36320182220) 对应提交 `7813084b4a0f6bed0fbbf6aaea46b7279a1aaaf7`，结论为 success。
+- 公网交互复测通过：Otsu 直道 T=120、阴影场景 T=102；固定 T=40 与局部均值输出不同；Sobel 输出始终为 0/255 二值图，阈值 70/220 时计数分别为 44/0；扫线叠加图和红色边界爬行轨迹均可见；IPM 控制点随滑杆变化。
+- 1440、768、375 px 公网视口均无横向溢出；首个键盘焦点仍是跳转链接。9 个课程下载/署名资源端点均返回 HTTP 200 且有内容长度或正文；0 个控制台错误、脚本错误、失败请求、缺 alt 图片或未加载图片。
+- 桌面和手机页面及互动 05/06 截图已人工查看。因没有已提交的像素基线，自动视觉回归仍标为 INCONCLUSIVE。
+
 ## 来源与边界
 
 - Joshua.Xu 第18届图文系列页面声明 CC BY-SA 4.0；本课引用的三张原文示意图保持原样、保留水印并在署名表列明来源。课程正文、原创示意图和 C99 算例独立编写。
